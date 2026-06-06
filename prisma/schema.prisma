@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Trip {
+  id                   String   @id @default(cuid())
+  createdAt            DateTime @default(now())
+
+  // Traveller details
+  fullName             String
+  email                String
+  phone                String
+
+  // Route & dates
+  originCity           String
+  destinations         String   // JSON array of strings
+  departureDate        String
+  returnDate           String
+  numberOfNights       Int
+
+  // Budget
+  totalBudget          Float
+  currency             String
+
+  // Travellers & class
+  numberOfTravellers   Int
+  cabinClass           String   // economy | business | first
+
+  // Accommodation
+  hotelStarRating      Int
+  locationPreference   String   // city_centre | airport | flexible
+  amenities            String   // JSON array
+
+  // Trip context
+  tripPurpose          String
+  specialRequirements  String?
+  loyaltyNumbers       String?
+
+  // PIN protection
+  pin                  String?
+
+  plans                Plan[]
+  booking              Booking?
+}
+
+model Plan {
+  id              String   @id @default(cuid())
+  tripId          String
+  trip            Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  planIndex       Int      // 0-4
+
+  label           String   // e.g. "Best Value", "Fastest Route"
+  justification   String
+
+  // Flight details (JSON)
+  flights         String   // JSON: [{airline, departure, arrival, layovers, price}]
+
+  // Hotel details (JSON)
+  hotel           String   // JSON: {name, location, stars, nightlyRate, totalCost, amenities}
+
+  flightCost      Float
+  hotelCost       Float
+  totalCost       Float
+
+  booking         Booking?
+}
+
+model Booking {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  tripId      String   @unique
+  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  planId      String   @unique
+  plan        Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  status      String   @default("confirmed") // confirmed | cancelled
+  reference   String   @unique
+}

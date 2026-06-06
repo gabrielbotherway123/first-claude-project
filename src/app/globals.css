@@ -1,26 +1,63 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --navy: #0a1628;
+  --navy-light: #122040;
+  --navy-mid: #1a3060;
+  --gold: #c9a84c;
+  --gold-light: #d4b96a;
+  --gold-pale: #f5edd8;
+  --cream: #fdfaf5;
+  --slate: #4a5568;
+  --slate-light: #718096;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--cream);
+  --color-foreground: var(--navy);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: var(--cream);
+  color: var(--navy);
+  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.gold-gradient {
+  background: linear-gradient(135deg, #c9a84c, #d4b96a, #c9a84c);
+}
+
+.navy-gradient {
+  background: linear-gradient(135deg, var(--navy), var(--navy-mid));
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #c9a84c 25%, #f5edd8 50%, #c9a84c 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.plan-card-selected {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 2px var(--gold), 0 8px 32px rgba(201,168,76,0.18);
 }

@@ -6,7 +6,8 @@
       "Read(//usr/local/bin/**)",
       "Read(//Users/gabrielbotherway/.nvm/versions/**)",
       "Bash(find /Users/gabrielbotherway -name \"node\" -type f 2>/dev/null | head -5; find /usr -name \"node\" -type f 2>/dev/null | head -5; ls ~/.nvm/ 2>/dev/null)",
-      "Bash(ls /opt/homebrew/bin/ 2>/dev/null | head -20; ls /usr/local/bin/ 2>/dev/null | grep -i node)"
+      "Bash(ls /opt/homebrew/bin/ 2>/dev/null | head -20; ls /usr/local/bin/ 2>/dev/null | grep -i node)",
+      "Bash(mkdir -p \"/Users/gabrielbotherway/Downloads/first_claude_project/src/app/api/bookings/[id]\")"
     ]
   }
 }
