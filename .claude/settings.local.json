@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git)",
+      "Bash(npm --version)",
+      "Read(//usr/local/bin/**)",
+      "Read(//Users/gabrielbotherway/.nvm/versions/**)",
+      "Bash(find /Users/gabrielbotherway -name \"node\" -type f 2>/dev/null | head -5; find /usr -name \"node\" -type f 2>/dev/null | head -5; ls ~/.nvm/ 2>/dev/null)",
+      "Bash(ls /opt/homebrew/bin/ 2>/dev/null | head -20; ls /usr/local/bin/ 2>/dev/null | grep -i node)"
+    ]
+  }
+}
