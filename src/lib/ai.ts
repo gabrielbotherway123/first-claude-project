@@ -1,9 +1,19 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { TripFormData, TravelPlan, FlightDetail, HotelDetail } from "./types";
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+// Instantiate lazily so a missing key fails with a clear message at call time
+// rather than throwing an opaque SDK error when the module is first imported.
+let client: Anthropic | null = null;
+function getClient(): Anthropic {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "Itinerary generation is not configured yet. Add ANTHROPIC_API_KEY to your .env file."
+    );
+  }
+  if (!client) client = new Anthropic({ apiKey });
+  return client;
+}
 
 const PLAN_LABELS = [
   "Best Value",
@@ -16,7 +26,7 @@ const PLAN_LABELS = [
 export async function generateTravelPlans(trip: TripFormData): Promise<TravelPlan[]> {
   const prompt = buildPrompt(trip);
 
-  const response = await client.messages.create({
+  const response = await getClient().messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 8000,
     system: `You are an expert corporate travel planner with access to real-time flight and hotel data.
@@ -59,6 +69,8 @@ TRIP DETAILS:
 - Class: ${trip.cabinClass}
 - Total budget: ${trip.currency} ${trip.totalBudget}
 - Purpose: ${trip.tripPurpose}
+- Preferred airline: ${trip.preferredAirline || "no preference"}
+- Airline rewards number: ${trip.airlineRewards || "none"}
 - Hotel: ${trip.hotelStarRating} stars, ${trip.locationPreference.replace("_", " ")}
 - Amenities: ${amenitiesList || "standard"}
 - Loyalty numbers: ${trip.loyaltyNumbers || "none"}
@@ -70,6 +82,7 @@ PLAN REQUIREMENTS:
 - Plan 2: "Ultimate Luxury" - best airline business/first class, 5-star hotel, premium experience
 - Plan 3: "Flexible & Cancellable" - fully refundable flights and hotel, flexible dates
 - Plan 4: "Loyalty Rewards" - maximise loyalty points/miles accumulation, preferred airline partners
+${trip.preferredAirline ? `\nAIRLINE PREFERENCE: The traveller prefers ${trip.preferredAirline}. Use this carrier (or its alliance partners) where sensible — especially for the Fastest Route, Ultimate Luxury and Loyalty Rewards plans${trip.airlineRewards ? `, where their rewards number ${trip.airlineRewards} applies` : ""}. The Best Value plan may still use a cheaper alternative.` : ""}
 
 Each plan MUST include realistic:
 - Outbound and return flights with specific airline names, flight numbers, realistic times

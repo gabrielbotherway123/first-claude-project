@@ -7,7 +7,24 @@
       "Read(//Users/gabrielbotherway/.nvm/versions/**)",
       "Bash(find /Users/gabrielbotherway -name \"node\" -type f 2>/dev/null | head -5; find /usr -name \"node\" -type f 2>/dev/null | head -5; ls ~/.nvm/ 2>/dev/null)",
       "Bash(ls /opt/homebrew/bin/ 2>/dev/null | head -20; ls /usr/local/bin/ 2>/dev/null | grep -i node)",
-      "Bash(mkdir -p \"/Users/gabrielbotherway/Downloads/first_claude_project/src/app/api/bookings/[id]\")"
+      "Bash(mkdir -p \"/Users/gabrielbotherway/Downloads/first_claude_project/src/app/api/bookings/[id]\")",
+      "Bash(node -e \"console.log\\(require\\('next/package.json'\\).version\\)\")",
+      "Bash(grep -rn \"nodemailer\" src/)",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(git mv *)",
+      "Bash(mv proxy.ts src/proxy.ts)",
+      "Bash(cd \"/Users/gabrielbotherway/Downloads/first_claude_project\" && tail -40 /tmp/atlas-dev.log)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(pkill -f \"next-server\")",
+      "Bash(mkdir -p .claude)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(which -a npm node 2>/dev/null; ls -la /opt/homebrew/bin/npm /opt/homebrew/bin/node 2>/dev/null)",
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code}\\\\n\" http://localhost:3000/sign-in)",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill -9)",
+      "Bash(lsof -i:3000)",
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code}\\\\n\" http://localhost:3000/sign-up)",
+      "Bash(curl -s -o /dev/null -w \"sign-up status=%{http_code}\\\\n\" http://localhost:3000/sign-up)"
     ]
   }
 }

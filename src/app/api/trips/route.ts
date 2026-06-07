@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateTravelPlans } from "@/lib/ai";
 import { TripFormData } from "@/lib/types";
+import { auth } from "@/auth";
 
 export async function POST(req: NextRequest) {
   try {
-    const body: TripFormData = await req.json();
-
-    // PIN check
-    const appPin = process.env.APP_PIN;
-    if (appPin && body.pin !== appPin) {
-      return NextResponse.json({ error: "Invalid PIN" }, { status: 401 });
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const body: TripFormData = await req.json();
 
     // Generate AI plans first
     const plans = await generateTravelPlans(body);
@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
     // Save trip to DB
     const trip = await prisma.trip.create({
       data: {
+        userId: session.user.id,
         fullName: body.fullName,
         email: body.email,
         phone: body.phone,
@@ -31,6 +32,8 @@ export async function POST(req: NextRequest) {
         currency: body.currency,
         numberOfTravellers: body.numberOfTravellers,
         cabinClass: body.cabinClass,
+        preferredAirline: body.preferredAirline ?? null,
+        airlineRewards: body.airlineRewards ?? null,
         hotelStarRating: body.hotelStarRating,
         locationPreference: body.locationPreference,
         amenities: JSON.stringify(body.amenities),
@@ -64,6 +67,11 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const tripId = req.nextUrl.searchParams.get("tripId");
   if (!tripId) return NextResponse.json({ error: "Missing tripId" }, { status: 400 });
 
@@ -73,6 +81,9 @@ export async function GET(req: NextRequest) {
   });
 
   if (!trip) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (trip.userId !== session.user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const plans = trip.plans.map((p) => ({
     id: p.id,
@@ -101,6 +112,7 @@ export async function GET(req: NextRequest) {
       currency: trip.currency,
       numberOfTravellers: trip.numberOfTravellers,
       cabinClass: trip.cabinClass,
+      preferredAirline: trip.preferredAirline,
       hotelStarRating: trip.hotelStarRating,
       locationPreference: trip.locationPreference,
       amenities: JSON.parse(trip.amenities),

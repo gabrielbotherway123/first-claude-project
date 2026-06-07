@@ -19,12 +19,32 @@ export interface TripFormData {
   hotelStarRating: number;
   locationPreference: "city_centre" | "airport" | "flexible";
   amenities: string[];
+  // Airline preference
+  preferredAirline?: string;
+  airlineRewards?: string;
   // Context
   tripPurpose: string;
   specialRequirements?: string;
   loyaltyNumbers?: string;
-  // Auth
-  pin?: string;
+}
+
+export interface PreferredAirline {
+  airline: string;
+  rewardsNumber: string;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+  phone: string;
+  defaultAirports: string[];
+  preferredAirlines: PreferredAirline[];
+  defaultCabinClass: "" | "economy" | "business" | "first";
+  defaultHotelStars: number | null;
+  defaultLocationPreference: "" | "city_centre" | "airport" | "flexible";
+  standingRequirements: string;
 }
 
 export interface FlightDetail {

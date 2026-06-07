@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendBookingConfirmation } from "@/lib/email";
+import { auth } from "@/auth";
 
 function generateReference(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -13,10 +14,21 @@ function generateReference(): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { tripId, planId } = await req.json();
 
     if (!tripId || !planId) {
       return NextResponse.json({ error: "Missing tripId or planId" }, { status: 400 });
+    }
+
+    // Verify the trip belongs to the signed-in user.
+    const trip = await prisma.trip.findUnique({ where: { id: tripId } });
+    if (!trip || trip.userId !== session.user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Check no existing booking

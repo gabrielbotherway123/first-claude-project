@@ -1,16 +1,21 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
+import { Providers } from "@/components/providers";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Executive Travel Planner",
-  description: "Premium AI-powered corporate travel planning",
+  title: "Atlas — Private Travel",
+  description: "Bespoke travel itineraries, planned in seconds.",
 };
+
+// Set the theme class before paint to avoid a flash of the wrong theme.
+const themeScript = `(function(){try{var t=localStorage.getItem('theme')||'dark';if(t==='light')document.documentElement.classList.add('light');}catch(e){}})();`;
 
 export default function RootLayout({
   children,
@@ -18,8 +23,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-[#fdfaf5]">{children}</body>
+    <html lang="en" className={`${inter.variable} h-full`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="min-h-full antialiased">
+        <div className="ambient-bg" aria-hidden />
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

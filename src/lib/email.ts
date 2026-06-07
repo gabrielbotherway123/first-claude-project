@@ -26,7 +26,7 @@ async function sendViaResend(
   const resend = new Resend(process.env.RESEND_API_KEY);
 
   await resend.emails.send({
-    from: "Executive Travel <noreply@yourdomain.com>",
+    from: "Atlas Travel <noreply@yourdomain.com>",
     to: [to],
     subject: `Booking Confirmed — Reference ${reference}`,
     html,
@@ -46,7 +46,7 @@ function buildEmailHtml(booking: BookingDetails): string {
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;padding:24px">
     <tr>
       <td style="background:#0a1628;padding:32px;text-align:center;border-radius:8px 8px 0 0">
-        <p style="color:#c9a84c;font-size:12px;letter-spacing:4px;margin:0 0 8px">EXECUTIVE TRAVEL</p>
+        <p style="color:#c9a84c;font-size:12px;letter-spacing:4px;margin:0 0 8px">ATLAS</p>
         <h1 style="color:#ffffff;font-size:24px;margin:0">Booking Confirmed</h1>
         <p style="color:#c9a84c;font-size:18px;margin:8px 0 0;letter-spacing:2px">${reference}</p>
       </td>
@@ -105,7 +105,7 @@ function buildEmailHtml(booking: BookingDetails): string {
     </tr>
     <tr>
       <td style="padding:16px;text-align:center">
-        <p style="color:#718096;font-size:12px;margin:0">Executive Travel Planner · Confidential</p>
+        <p style="color:#718096;font-size:12px;margin:0">Atlas · Private Travel</p>
       </td>
     </tr>
   </table>
