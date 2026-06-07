@@ -1,9 +1,10 @@
 import "server-only";
 import type { TripFormData, UserProfile, TravelPlan, HotelDetail, FlightDetail } from "@/lib/types";
-import { extractIata, cityFor } from "@/lib/airports";
+import { extractIata, cityFor, countryFor } from "@/lib/airports";
 import { searchFlights, type FlightOffer } from "@/lib/providers/amadeus";
 import { searchHotels, bookingSearchLink, type HotelOption } from "@/lib/providers/booking";
 import { getTransferEstimate } from "@/lib/providers/uber";
+import { estimateFlights, estimateHotels } from "@/lib/providers/estimate";
 import { scrapeFlights } from "@/lib/scrapers/flights";
 import { scrapeHotels } from "@/lib/scrapers/hotels";
 import { scrapeTransfer } from "@/lib/scrapers/transport";
@@ -95,29 +96,37 @@ export async function buildItineraries(
   const checkIn = trip.departureDate;
   const checkOut = trip.returnDate || addDays(trip.departureDate, trip.numberOfNights || 1);
   const destCity = cityFor(trip.destinations[0]);
+  const originCountry = countryFor(trip.originCity);
+  const destinationCountry = countryFor(trip.destinations[0]);
+  let flightsEstimated = false;
+  let hotelsEstimated = false;
 
-  // Run all three scrapers in parallel.
-  const [flightScrape, hotelScrape, transferScrape] = await Promise.all([
-    scrapeFlights({
-      origin,
-      destination,
-      departureDate: trip.departureDate,
-      returnDate: trip.returnDate || undefined,
-      adults: trip.numberOfTravellers,
-      cabinClass: trip.cabinClass,
-      currency: trip.currency,
-    }).catch((e) => ({ ok: false as const, error: String(e) })),
-    scrapeHotels({
-      city: destCity,
-      checkIn,
-      checkOut,
-      adults: trip.numberOfTravellers,
-      stars: trip.hotelStarRating,
-      currency: trip.currency,
-      nights: trip.numberOfNights || 1,
-    }).catch((e) => ({ ok: false as const, error: String(e) })),
-    scrapeTransfer({ from: `${destination} Airport`, to: destCity, currency: trip.currency }).catch(() => null),
-  ]);
+  // Scraping is opt-in (ENABLE_SCRAPING=true): it's slow and usually blocked, so
+  // by default we skip straight to the API/estimate path for an instant result.
+  const scrapingEnabled = process.env.ENABLE_SCRAPING === "true";
+  const [flightScrape, hotelScrape, transferScrape] = scrapingEnabled
+    ? await Promise.all([
+        scrapeFlights({
+          origin,
+          destination,
+          departureDate: trip.departureDate,
+          returnDate: trip.returnDate || undefined,
+          adults: trip.numberOfTravellers,
+          cabinClass: trip.cabinClass,
+          currency: trip.currency,
+        }).catch((e) => ({ ok: false as const, error: String(e) })),
+        scrapeHotels({
+          city: destCity,
+          checkIn,
+          checkOut,
+          adults: trip.numberOfTravellers,
+          stars: trip.hotelStarRating,
+          currency: trip.currency,
+          nights: trip.numberOfNights || 1,
+        }).catch((e) => ({ ok: false as const, error: String(e) })),
+        scrapeTransfer({ from: `${destination} Airport`, to: destCity, currency: trip.currency }).catch(() => null),
+      ])
+    : [{ ok: false as const, error: "Scraping disabled" }, { ok: false as const, error: "Scraping disabled" }, null];
 
   // ── Flights: scraped → Amadeus fallback → fail ──
   let offers: FlightOffer[];
@@ -139,7 +148,20 @@ export async function buildItineraries(
       offers = api.data;
       flightSource = "Amadeus (fallback)";
     } else {
-      throw new Error("Could not load live prices for this route — try adjusting your search.");
+      // No key + scrape blocked → indicative estimate so the app still works.
+      offers = estimateFlights({
+        origin,
+        destination,
+        departureDate: trip.departureDate,
+        returnDate: trip.returnDate || undefined,
+        adults: trip.numberOfTravellers,
+        cabinClass: trip.cabinClass,
+        currency: trip.currency,
+        originCountry,
+        destinationCountry,
+      });
+      flightSource = "Indicative estimate";
+      flightsEstimated = true;
     }
   }
 
@@ -164,8 +186,19 @@ export async function buildItineraries(
       liveHotels = api.data;
       hotelSource = "Booking.com (API)";
     } else {
+      // Indicative hotels (real affiliate link to confirm & book a real one).
+      liveHotels = estimateHotels({
+        city: destCity,
+        checkIn,
+        checkOut,
+        adults: trip.numberOfTravellers,
+        stars: trip.hotelStarRating,
+        currency: trip.currency,
+        nights: trip.numberOfNights || 1,
+      });
       hotelOk = false;
-      hotelSource = "Booking.com (affiliate links)";
+      hotelsEstimated = true;
+      hotelSource = "Indicative estimate";
     }
   }
 
@@ -218,8 +251,14 @@ export async function buildItineraries(
   }
 
   const unavailableShared: string[] = [];
-  if (!hotelOk) unavailableShared.push("Live hotel prices unavailable — showing Booking.com search links.");
-  if (!transfer.live) unavailableShared.push("Live transfer fare unavailable — showing an approximate estimate.");
+  if (flightsEstimated)
+    unavailableShared.push("Flight prices are indicative estimates — confirm the live fare via the booking link.");
+  if (hotelsEstimated)
+    unavailableShared.push("Hotel prices are indicative — open the Booking.com link to pick and confirm a real hotel.");
+  if (!hotelOk && !hotelsEstimated)
+    unavailableShared.push("Live hotel prices unavailable — showing Booking.com search links.");
+  if (!transfer.live)
+    unavailableShared.push("Transfer fare is an approximate estimate.");
 
   const sources = [flightSource, hotelSource, transferSource];
 
