@@ -1,12 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { FloatingInput, FloatingTextarea, FloatingSelect, GlassCard, Button } from "@/components/ui";
+import { FloatingInput, FloatingTextarea, GlassCard, Button } from "@/components/ui";
+import { Select } from "@/components/select";
+import { DateRangePicker } from "@/components/date-range-picker";
 import { AirportSearch } from "@/components/airport-search";
 import { AirlineSelect } from "@/components/airline-select";
+import { countryFor } from "@/lib/airports";
 import type { TripFormData, UserProfile } from "@/lib/types";
+
+const DRAFT_KEY = "atlas:tripDraft";
 
 const CURRENCIES = ["GBP", "USD", "EUR", "CHF", "SGD", "AED", "JPY", "AUD", "NZD"];
 const AMENITIES = [
@@ -20,21 +25,23 @@ const PURPOSES = [
   "Investor Relations", "Team Leadership", "Leisure", "Other",
 ];
 
-function nightsBetween(a: string, b: string): number | null {
-  if (!a || !b) return null;
-  const d1 = new Date(a);
-  const d2 = new Date(b);
-  const diff = Math.round((d2.getTime() - d1.getTime()) / 86_400_000);
-  return diff > 0 ? diff : null;
+function localeCurrency(): string {
+  try {
+    const lang = navigator.language || "en-GB";
+    const loc = new Intl.Locale(lang);
+    const region = (loc.maximize?.().region ?? loc.region ?? "").toUpperCase();
+    const map: Record<string, string> = {
+      US: "USD", GB: "GBP", CH: "CHF", SG: "SGD", AE: "AED", JP: "JPY",
+      AU: "AUD", NZ: "NZD", DE: "EUR", FR: "EUR", ES: "EUR", IT: "EUR", NL: "EUR", IE: "EUR",
+    };
+    return map[region] ?? "GBP";
+  } catch {
+    return "GBP";
+  }
 }
 
-export function TripPlanner({ profile }: { profile: UserProfile }) {
-  const router = useRouter();
-  const [step, setStep] = useState<1 | 2>(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const [form, setForm] = useState<TripFormData>({
+function buildDefaults(profile: UserProfile): TripFormData {
+  return {
     fullName: profile.name,
     email: profile.email,
     phone: profile.phone,
@@ -42,35 +49,98 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
     destinations: [""],
     departureDate: "",
     returnDate: "",
-    numberOfNights: 1,
-    totalBudget: 5000,
+    numberOfNights: 0,
+    totalBudget: 0, // blank — no placeholder amount
     currency: "GBP",
     numberOfTravellers: 1,
-    cabinClass: (profile.defaultCabinClass || "business") as TripFormData["cabinClass"],
+    cabinClass: "economy", // Economy is the default
     preferredAirline: "",
     airlineRewards: "",
     hotelStarRating: profile.defaultHotelStars ?? 5,
-    locationPreference: (profile.defaultLocationPreference ||
-      "city_centre") as TripFormData["locationPreference"],
+    locationPreference: (profile.defaultLocationPreference || "city_centre") as TripFormData["locationPreference"],
     amenities: [],
     tripPurpose: "",
     specialRequirements: profile.standingRequirements,
     loyaltyNumbers: "",
-  });
+  };
+}
+
+function nightsBetween(a: string, b: string): number {
+  if (!a || !b) return 0;
+  const diff = Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000);
+  return diff > 0 ? diff : 0;
+}
+
+export function TripPlanner({ profile }: { profile: UserProfile }) {
+  const router = useRouter();
+  const [step, setStep] = useState<1 | 2>(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [draftRestored, setDraftRestored] = useState(false);
+  const hydrated = useRef(false);
+
+  const [form, setForm] = useState<TripFormData>(() => buildDefaults(profile));
+
+  // Rehydrate from localStorage (or seed currency from locale) on mount.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        setForm((prev) => ({ ...prev, ...saved }));
+        setDraftRestored(true);
+      } else {
+        setForm((prev) => ({ ...prev, currency: localeCurrency() }));
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      hydrated.current = true;
+    }
+  }, []);
+
+  // Debounced persistence to localStorage on every change.
+  useEffect(() => {
+    if (!hydrated.current || loading) return;
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(form));
+      } catch {
+        /* ignore */
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [form, loading]);
 
   function set<K extends keyof TripFormData>(key: K, value: TripFormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  // Auto-compute nights when both dates are set.
-  function setDate(key: "departureDate" | "returnDate", value: string) {
-    setForm((prev) => {
-      const next = { ...prev, [key]: value };
-      const n = nightsBetween(next.departureDate, next.returnDate);
-      if (n) next.numberOfNights = n;
-      return next;
-    });
+  function clearDraft() {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      /* ignore */
+    }
+    setForm({ ...buildDefaults(profile), currency: localeCurrency() });
+    setDraftRestored(false);
+    setStep(1);
   }
+
+  function setDates(from: string, to: string) {
+    setForm((prev) => ({
+      ...prev,
+      departureDate: from,
+      returnDate: to,
+      numberOfNights: nightsBetween(from, to),
+    }));
+  }
+
+  const departureCountry = useMemo(() => countryFor(form.originCity), [form.originCity]);
+  const destinationCountry = useMemo(
+    () => countryFor(form.destinations[0] ?? ""),
+    [form.destinations]
+  );
 
   const savedAirlineMatch = useMemo(() => {
     if (!form.preferredAirline) return undefined;
@@ -106,6 +176,8 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
       return setError("Please fill in all destination fields.");
     if (!form.departureDate || !form.returnDate)
       return setError("Please choose your travel dates.");
+    if (!form.totalBudget || form.totalBudget <= 0)
+      return setError("Please enter a budget.");
     if (!form.tripPurpose) return setError("Please select the purpose of your trip.");
 
     setLoading(true);
@@ -117,6 +189,7 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to generate itineraries");
+      localStorage.removeItem(DRAFT_KEY);
       router.push(`/plans/${data.tripId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -127,35 +200,54 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
   if (loading) return <PlanningScreen />;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10">
+    <div className="max-w-3xl mx-auto px-4 py-12 sm:py-16">
       {/* Hero */}
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="text-center mb-10"
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="text-center mb-12"
       >
-        <p className="text-xs tracking-[0.3em] uppercase text-[var(--accent)] mb-3">
+        <p className="text-xs tracking-[0.35em] uppercase text-[var(--text-dim)] mb-4">
           Bespoke Travel
         </p>
-        <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight mb-3">
+        <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight mb-4 leading-[1.05]">
           Where to next,{" "}
           <span className="accent-text">{profile.name?.split(" ")[0] || "traveller"}</span>?
         </h1>
-        <p className="text-[var(--text-muted)] max-w-lg mx-auto">
-          Tell us about your journey and receive five tailored itineraries — flights and
-          accommodation, ready to book.
+        <p className="text-[var(--text-muted)] max-w-md mx-auto text-lg leading-relaxed">
+          Tell us about your journey and receive five tailored itineraries.
         </p>
       </motion.div>
 
-      {/* Stepper */}
-      <div className="flex items-center justify-center gap-3 mb-8">
-        {([1, 2] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => setStep(s)}
-            className="flex items-center gap-2 text-sm"
+      <AnimatePresence>
+        {draftRestored && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-6"
           >
+            <div className="glass rounded-2xl px-4 py-3 flex items-center justify-between text-sm">
+              <span className="text-[var(--text-muted)] flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full accent-gradient" />
+                Draft restored — picking up where you left off
+              </span>
+              <button
+                onClick={clearDraft}
+                className="text-[var(--accent)] hover:underline font-medium"
+              >
+                Start fresh
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Stepper */}
+      <div className="flex items-center justify-center gap-3 mb-10">
+        {([1, 2] as const).map((s) => (
+          <button key={s} onClick={() => setStep(s)} className="flex items-center gap-2 text-sm">
             <span
               className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                 step === s
@@ -176,13 +268,13 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
         {step === 1 ? (
           <motion.div
             key="step1"
-            initial={{ opacity: 0, x: -24 }}
+            initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-5"
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6"
           >
-            <GlassCard strong className="p-6 space-y-4">
+            <GlassCard strong className="p-7 space-y-5">
               <SectionTitle>Traveller</SectionTitle>
               <div className="grid sm:grid-cols-2 gap-4">
                 <FloatingInput label="Full name" value={form.fullName} onChange={(e) => set("fullName", e.target.value)} />
@@ -191,7 +283,7 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
               </div>
             </GlassCard>
 
-            <GlassCard strong className="p-6 space-y-4">
+            <GlassCard strong className="p-7 space-y-5">
               <SectionTitle>Route</SectionTitle>
 
               {profile.defaultAirports.length > 0 && (
@@ -248,32 +340,43 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
               </div>
             </GlassCard>
 
-            <GlassCard strong className="p-6 space-y-4">
+            <GlassCard strong className="p-7 space-y-5">
               <SectionTitle>Dates & party</SectionTitle>
+              <DateRangePicker from={form.departureDate} to={form.returnDate} onChange={setDates} />
               <div className="grid sm:grid-cols-3 gap-4">
-                <FloatingInput label="Departure" type="date" value={form.departureDate} onChange={(e) => setDate("departureDate", e.target.value)} />
-                <FloatingInput label="Return" type="date" value={form.returnDate} onChange={(e) => setDate("returnDate", e.target.value)} />
-                <FloatingInput label="Nights" type="number" min={1} value={form.numberOfNights} onChange={(e) => set("numberOfNights", parseInt(e.target.value) || 1)} />
-              </div>
-              <div className="grid sm:grid-cols-3 gap-4">
-                <FloatingInput label="Total budget" type="number" min={0} value={form.totalBudget} onChange={(e) => set("totalBudget", parseFloat(e.target.value) || 0)} />
-                <FloatingSelect label="Currency" value={form.currency} onChange={(e) => set("currency", e.target.value)}>
-                  {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
-                </FloatingSelect>
-                <FloatingInput label="Travellers" type="number" min={1} max={20} value={form.numberOfTravellers} onChange={(e) => set("numberOfTravellers", parseInt(e.target.value) || 1)} />
-              </div>
-              <div>
-                <FieldLabel>Cabin class</FieldLabel>
-                <Segmented
-                  options={[
-                    { value: "economy", label: "Economy" },
-                    { value: "business", label: "Business" },
-                    { value: "first", label: "First" },
-                  ]}
-                  value={form.cabinClass}
-                  onChange={(v) => set("cabinClass", v as TripFormData["cabinClass"])}
+                <FloatingInput
+                  label="Total budget"
+                  type="number"
+                  min={0}
+                  value={form.totalBudget ? form.totalBudget : ""}
+                  onChange={(e) => set("totalBudget", e.target.value ? parseFloat(e.target.value) : 0)}
+                />
+                <Select
+                  label="Currency"
+                  value={form.currency}
+                  onChange={(v) => set("currency", v)}
+                  options={CURRENCIES.map((c) => ({ value: c, label: c }))}
+                />
+                <Select
+                  label="Travellers"
+                  value={String(form.numberOfTravellers)}
+                  onChange={(v) => set("numberOfTravellers", Number(v))}
+                  options={Array.from({ length: 12 }, (_, i) => ({
+                    value: String(i + 1),
+                    label: `${i + 1} ${i === 0 ? "traveller" : "travellers"}`,
+                  }))}
                 />
               </div>
+              <Select
+                label="Cabin class"
+                value={form.cabinClass}
+                onChange={(v) => set("cabinClass", v as TripFormData["cabinClass"])}
+                options={[
+                  { value: "economy", label: "Economy" },
+                  { value: "business", label: "Business" },
+                  { value: "first", label: "First" },
+                ]}
+              />
             </GlassCard>
 
             <div className="flex justify-end">
@@ -283,38 +386,35 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
         ) : (
           <motion.div
             key="step2"
-            initial={{ opacity: 0, x: 24 }}
+            initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 24 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-5"
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6"
           >
-            <GlassCard strong className="p-6 space-y-4">
+            <GlassCard strong className="p-7 space-y-5">
               <SectionTitle>Airline</SectionTitle>
               <div className="grid sm:grid-cols-2 gap-4">
                 <AirlineSelect
                   label="Preferred airline"
                   value={form.preferredAirline ?? ""}
                   onSelect={(a) => selectAirline(a?.name ?? "")}
+                  departureCountry={departureCountry}
+                  destinationCountry={destinationCountry}
                 />
                 <div>
                   <FloatingInput
                     label="Rewards number"
                     value={form.airlineRewards ?? ""}
                     onChange={(e) => set("airlineRewards", e.target.value)}
-                    placeholder=" "
                   />
                   {savedAirlineMatch && (
-                    <p className="mt-1 text-xs text-[var(--accent)]">
-                      ✓ Applied from your saved profile
-                    </p>
+                    <p className="mt-1 text-xs text-[var(--accent)]">✓ Applied from your saved profile</p>
                   )}
                   {form.preferredAirline && !savedAirlineMatch && (
                     <p className="mt-1 text-xs text-[var(--text-dim)]">
                       Add it in your{" "}
-                      <a href="/profile" className="text-[var(--accent)] hover:underline">
-                        profile
-                      </a>{" "}
+                      <a href="/profile" className="text-[var(--accent)] hover:underline">profile</a>{" "}
                       to save for next time.
                     </p>
                   )}
@@ -322,26 +422,25 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
               </div>
             </GlassCard>
 
-            <GlassCard strong className="p-6 space-y-4">
+            <GlassCard strong className="p-7 space-y-5">
               <SectionTitle>Accommodation</SectionTitle>
-              <div className="grid sm:grid-cols-2 gap-5">
-                <div>
-                  <FieldLabel>Hotel rating</FieldLabel>
-                  <Segmented
-                    options={[3, 4, 5].map((s) => ({ value: String(s), label: `${s}★` }))}
-                    value={String(form.hotelStarRating)}
-                    onChange={(v) => set("hotelStarRating", Number(v) || 5)}
-                  />
-                </div>
-                <FloatingSelect
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Select
+                  label="Hotel rating"
+                  value={String(form.hotelStarRating)}
+                  onChange={(v) => set("hotelStarRating", Number(v))}
+                  options={[3, 4, 5].map((s) => ({ value: String(s), label: `${s} stars` }))}
+                />
+                <Select
                   label="Location preference"
                   value={form.locationPreference}
-                  onChange={(e) => set("locationPreference", e.target.value as TripFormData["locationPreference"])}
-                >
-                  <option value="city_centre">City centre</option>
-                  <option value="airport">Near airport</option>
-                  <option value="flexible">Flexible</option>
-                </FloatingSelect>
+                  onChange={(v) => set("locationPreference", v as TripFormData["locationPreference"])}
+                  options={[
+                    { value: "city_centre", label: "City centre" },
+                    { value: "airport", label: "Near airport" },
+                    { value: "flexible", label: "Flexible" },
+                  ]}
+                />
               </div>
               <div>
                 <FieldLabel>Preferred amenities</FieldLabel>
@@ -364,13 +463,16 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
               </div>
             </GlassCard>
 
-            <GlassCard strong className="p-6 space-y-4">
+            <GlassCard strong className="p-7 space-y-5">
               <SectionTitle>Context</SectionTitle>
               <div className="grid sm:grid-cols-2 gap-4">
-                <FloatingSelect label="Purpose of trip" value={form.tripPurpose} onChange={(e) => set("tripPurpose", e.target.value)}>
-                  <option value="">Select…</option>
-                  {PURPOSES.map((p) => <option key={p}>{p}</option>)}
-                </FloatingSelect>
+                <Select
+                  label="Purpose of trip"
+                  value={form.tripPurpose}
+                  onChange={(v) => set("tripPurpose", v)}
+                  placeholder="Select…"
+                  options={PURPOSES.map((p) => ({ value: p, label: p }))}
+                />
                 <FloatingInput label="Other loyalty numbers" value={form.loyaltyNumbers ?? ""} onChange={(e) => set("loyaltyNumbers", e.target.value)} />
               </div>
               <FloatingTextarea
@@ -382,7 +484,7 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
             </GlassCard>
 
             {error && (
-              <div className="rounded-xl bg-[var(--danger)]/10 border border-[var(--danger)]/30 px-4 py-3 text-sm text-[var(--danger)]">
+              <div className="rounded-2xl bg-[var(--danger)]/10 border border-[var(--danger)]/30 px-4 py-3 text-sm text-[var(--danger)]">
                 {error}
               </div>
             )}
@@ -402,9 +504,10 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
 
 function PlanningScreen() {
   const steps = [
-    "Searching flights",
-    "Comparing fares & schedules",
-    "Curating accommodation",
+    "Searching live flight prices",
+    "Comparing fares across booking platforms",
+    "Pulling current hotel rates",
+    "Checking airport transfers",
     "Assembling five itineraries",
   ];
   return (
@@ -414,7 +517,7 @@ function PlanningScreen() {
         transition={{ repeat: Infinity, duration: 2.2, ease: "linear" }}
         className="w-16 h-16 rounded-full border-2 border-[var(--border)] border-t-[var(--accent)] mb-8"
       />
-      <p className="text-xs tracking-[0.3em] uppercase text-[var(--accent)] mb-2">One moment</p>
+      <p className="text-xs tracking-[0.3em] uppercase text-[var(--text-dim)] mb-2">One moment</p>
       <h2 className="text-2xl font-semibold mb-8">Designing your journey</h2>
       <div className="space-y-2.5">
         {steps.map((s, i) => (
@@ -422,7 +525,7 @@ function PlanningScreen() {
             key={s}
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.6 }}
+            transition={{ delay: i * 0.7 }}
             className="flex items-center gap-3 text-sm text-[var(--text-muted)]"
           >
             <span className="w-1.5 h-1.5 rounded-full accent-gradient" />
@@ -436,7 +539,7 @@ function PlanningScreen() {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--accent)]">
+    <h2 className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--text-dim)]">
       {children}
     </h2>
   );
@@ -444,43 +547,4 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <p className="text-sm text-[var(--text-muted)] mb-2">{children}</p>;
-}
-
-function Segmented({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: string; label: string }[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((o) => {
-        const selected = value === o.value;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            onClick={() => onChange(o.value)}
-            className={`relative px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
-              selected
-                ? "border-[var(--accent)] text-[var(--text)]"
-                : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]"
-            }`}
-          >
-            {selected && (
-              <motion.span
-                layoutId={`tp-seg-${options.map((x) => x.value).join("")}`}
-                className="absolute inset-0 rounded-xl bg-[var(--accent-soft)]"
-                transition={{ type: "spring", stiffness: 400, damping: 32 }}
-              />
-            )}
-            <span className="relative">{o.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
 }

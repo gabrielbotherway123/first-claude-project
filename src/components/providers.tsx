@@ -21,19 +21,19 @@ export function useTheme() {
 }
 
 function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
-    const stored = (localStorage.getItem("theme") as Theme | null) ?? "dark";
+    const stored = (localStorage.getItem("theme") as Theme | null) ?? "light";
     setTheme(stored);
-    document.documentElement.classList.toggle("light", stored === "light");
+    document.documentElement.classList.toggle("dark", stored === "dark");
   }, []);
 
   const toggle = useCallback(() => {
     setTheme((prev) => {
       const next = prev === "dark" ? "light" : "dark";
       localStorage.setItem("theme", next);
-      document.documentElement.classList.toggle("light", next === "light");
+      document.documentElement.classList.toggle("dark", next === "dark");
       return next;
     });
   }, []);

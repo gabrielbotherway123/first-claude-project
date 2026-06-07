@@ -24,7 +24,15 @@
       "Bash(xargs kill -9)",
       "Bash(lsof -i:3000)",
       "Bash(curl -s -o /dev/null -w \"status=%{http_code}\\\\n\" http://localhost:3000/sign-up)",
-      "Bash(curl -s -o /dev/null -w \"sign-up status=%{http_code}\\\\n\" http://localhost:3000/sign-up)"
+      "Bash(curl -s -o /dev/null -w \"sign-up status=%{http_code}\\\\n\" http://localhost:3000/sign-up)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(curl -s -o /dev/null -w \"sign-up=%{http_code}\\\\n\" http://localhost:3000/sign-up)",
+      "Bash(curl -s -o /dev/null -w \"/ status=%{http_code} redirect=%{redirect_url}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"/sign-in status=%{http_code}\\\\n\" http://localhost:3000/sign-in)",
+      "Bash(curl -s -o /dev/null -w \"ready=%{http_code}\\\\n\" http://localhost:3000/sign-up)",
+      "Bash(rm -f /tmp/check.mjs /tmp/airline-test.mjs)",
+      "Bash(git add *)"
     ]
   }
 }

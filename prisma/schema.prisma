@@ -131,6 +131,9 @@ model Plan {
   hotelCost  Float
   totalCost  Float
 
+  pricesFetchedAt String? // ISO timestamp of live price research
+  sources         String? // JSON array of booking platforms
+
   booking Booking?
 }
 

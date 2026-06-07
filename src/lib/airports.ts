@@ -155,3 +155,18 @@ export function searchAirports(query: string, limit = 8): Airport[] {
 export function formatAirport(a: Airport): string {
   return `${a.city} ${a.name} (${a.iata})`;
 }
+
+const BY_IATA = new Map(AIRPORTS.map((a) => [a.iata, a]));
+
+/** Extracts the IATA code from a formatted string like "Paris Charles de Gaulle (CDG)". */
+export function extractIata(formatted: string): string | null {
+  const m = formatted.match(/\(([A-Z]{3})\)\s*$/);
+  return m ? m[1] : null;
+}
+
+/** Resolves the country for a formatted airport string, if known. */
+export function countryFor(formatted: string): string | undefined {
+  const iata = extractIata(formatted);
+  if (!iata) return undefined;
+  return BY_IATA.get(iata)?.country;
+}

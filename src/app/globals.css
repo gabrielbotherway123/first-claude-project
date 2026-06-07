@@ -1,9 +1,33 @@
 @import "tailwindcss";
 
 /* ─── Design tokens ───────────────────────────────────────────
-   Dark is the default theme. `html.light` overrides for light. */
+   Light is the default (primary) experience. `html.dark` overrides.
+   Apple-inspired: off-whites, deep greys, one accent, soft shadows. */
 
 :root {
+  --bg: #fbfbfd;
+  --bg-2: #f5f5f7;
+  --surface: rgba(255, 255, 255, 0.68);
+  --surface-strong: rgba(255, 255, 255, 0.86);
+  --surface-solid: #ffffff;
+  --border: rgba(0, 0, 0, 0.06);
+  --border-strong: rgba(0, 0, 0, 0.1);
+  --text: #1d1d1f;
+  --text-muted: #515154;
+  --text-dim: #86868b;
+  --accent: #9c7a36;
+  --accent-2: #836429;
+  --accent-soft: rgba(156, 122, 54, 0.1);
+  --accent-contrast: #ffffff;
+  --danger: #d93025;
+  --success: #1a9d5a;
+  --ambient-1: rgba(120, 130, 200, 0.07);
+  --ambient-2: rgba(180, 150, 120, 0.06);
+  --ambient-3: rgba(156, 122, 54, 0.05);
+  --shadow: 0 12px 44px -16px rgba(0, 0, 0, 0.16);
+}
+
+html.dark {
   --bg: #07080f;
   --bg-2: #0b0e1a;
   --surface: rgba(255, 255, 255, 0.045);
@@ -20,33 +44,10 @@
   --accent-contrast: #0a0b12;
   --danger: #f87171;
   --success: #4ade80;
-  --ambient-1: rgba(79, 70, 229, 0.22);
-  --ambient-2: rgba(124, 58, 237, 0.18);
-  --ambient-3: rgba(227, 192, 105, 0.12);
+  --ambient-1: rgba(79, 70, 229, 0.2);
+  --ambient-2: rgba(124, 58, 237, 0.16);
+  --ambient-3: rgba(227, 192, 105, 0.1);
   --shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.7);
-}
-
-html.light {
-  --bg: #f6f7fb;
-  --bg-2: #eaedf5;
-  --surface: rgba(255, 255, 255, 0.72);
-  --surface-strong: rgba(255, 255, 255, 0.9);
-  --surface-solid: #ffffff;
-  --border: rgba(15, 23, 42, 0.08);
-  --border-strong: rgba(15, 23, 42, 0.16);
-  --text: #0f172a;
-  --text-muted: #475569;
-  --text-dim: #94a3b8;
-  --accent: #b07d24;
-  --accent-2: #9a6f1f;
-  --accent-soft: rgba(176, 125, 36, 0.12);
-  --accent-contrast: #ffffff;
-  --danger: #dc2626;
-  --success: #16a34a;
-  --ambient-1: rgba(99, 102, 241, 0.16);
-  --ambient-2: rgba(168, 85, 247, 0.12);
-  --ambient-3: rgba(176, 125, 36, 0.1);
-  --shadow: 0 24px 60px -28px rgba(15, 23, 42, 0.28);
 }
 
 @theme inline {
@@ -55,6 +56,7 @@ html.light {
   --color-text: var(--text);
   --color-accent: var(--accent);
   --font-sans: var(--font-inter), system-ui, sans-serif;
+  --radius-2xl: 1.25rem;
 }
 
 * {
@@ -68,40 +70,42 @@ html {
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
-  letter-spacing: -0.011em;
-  transition: background 0.4s ease, color 0.3s ease;
+  letter-spacing: -0.014em;
+  transition: background 0.5s ease, color 0.3s ease;
 }
 
-/* Ambient gradient backdrop applied to a fixed layer */
+/* Faint ambient backdrop — kept very subtle for the Apple feel */
 .ambient-bg {
   position: fixed;
   inset: 0;
   z-index: -1;
   background:
     radial-gradient(60% 50% at 15% 0%, var(--ambient-1), transparent 60%),
-    radial-gradient(50% 50% at 90% 10%, var(--ambient-2), transparent 55%),
+    radial-gradient(50% 50% at 90% 8%, var(--ambient-2), transparent 55%),
     radial-gradient(70% 60% at 50% 110%, var(--ambient-3), transparent 60%),
     var(--bg);
   background-attachment: fixed;
 }
 
-/* ─── Glass surfaces ───────────────────────────────────────── */
+/* ─── Glass surfaces (shadows over hard borders) ───────────── */
 
 .glass {
   background: var(--surface);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
   border: 1px solid var(--border);
+  border-radius: 1.25rem;
 }
 
 .glass-strong {
   background: var(--surface-strong);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  border: 1px solid var(--border-strong);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
   box-shadow: var(--shadow);
 }
 
@@ -117,14 +121,14 @@ body {
   color: transparent;
 }
 
-/* ─── Floating-label inputs ────────────────────────────────── */
+/* ─── Floating-label inputs (large radii, soft focus) ─────── */
 
 .field-input {
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0.85rem;
-  padding: 1.4rem 1rem 0.55rem;
+  border-radius: 0.95rem;
+  padding: 1.45rem 1rem 0.55rem;
   color: var(--text);
   font-size: 0.95rem;
   outline: none;
@@ -135,7 +139,7 @@ body {
 }
 .field-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 4px var(--accent-soft);
   background: var(--surface-strong);
 }
 .field-input:disabled {
@@ -166,14 +170,14 @@ textarea.field-input {
   font-weight: 600;
 }
 
-/* ─── Animations ───────────────────────────────────────────── */
+/* ─── Animations (physical, intentional) ───────────────────── */
 
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .fade-in-up {
-  animation: fadeInUp 0.5s ease forwards;
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes shimmer {
@@ -189,19 +193,11 @@ textarea.field-input {
   -webkit-text-fill-color: transparent;
 }
 
-@keyframes float-orb {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-18px) scale(1.04); }
-}
-.float-orb { animation: float-orb 8s ease-in-out infinite; }
-
-/* Legacy support for not-yet-redesigned pages */
 .plan-card-selected {
   border-color: var(--accent) !important;
   box-shadow: 0 0 0 2px var(--accent), 0 8px 32px var(--accent-soft);
 }
 
-/* Scrollbar polish */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);

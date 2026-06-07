@@ -43,6 +43,63 @@ export const AIRLINES: Airline[] = [
   { code: "AS", name: "Alaska Airlines", alliance: "Oneworld", program: "Mileage Plan" },
 ];
 
+// National / flag carrier by country (only countries whose carrier is in AIRLINES).
+const COUNTRY_CARRIERS: Record<string, string> = {
+  "United Kingdom": "BA",
+  "United States": "AA",
+  Canada: "AC",
+  France: "AF",
+  Germany: "LH",
+  Netherlands: "KL",
+  Spain: "IB",
+  Italy: "AZ",
+  Switzerland: "LX",
+  Turkey: "TK",
+  "United Arab Emirates": "EK",
+  Qatar: "QR",
+  Japan: "NH",
+  "South Korea": "KE",
+  China: "CA",
+  "Hong Kong": "CX",
+  Singapore: "SQ",
+  Thailand: "TG",
+  Malaysia: "MH",
+  India: "AI",
+  Australia: "QF",
+  "New Zealand": "NZ",
+  "South Africa": "SA",
+  Ethiopia: "ET",
+  Brazil: "LA",
+  Chile: "LA",
+};
+
+export function nationalCarrier(country: string | undefined): Airline | undefined {
+  if (!country) return undefined;
+  const code = COUNTRY_CARRIERS[country];
+  return code ? AIRLINES.find((a) => a.code === code) : undefined;
+}
+
+/**
+ * Surfaces national carriers (departure first, destination second if different)
+ * at the top, with all remaining airlines sorted alphabetically below.
+ */
+export function suggestAirlines(
+  departureCountry?: string,
+  destinationCountry?: string
+): { suggested: Airline[]; rest: Airline[] } {
+  const suggested: Airline[] = [];
+  const dep = nationalCarrier(departureCountry);
+  const dest = nationalCarrier(destinationCountry);
+  if (dep) suggested.push(dep);
+  if (dest && dest.code !== dep?.code) suggested.push(dest);
+
+  const suggestedCodes = new Set(suggested.map((a) => a.code));
+  const rest = AIRLINES.filter((a) => !suggestedCodes.has(a.code)).sort((x, y) =>
+    x.name.localeCompare(y.name)
+  );
+  return { suggested, rest };
+}
+
 export function searchAirlines(query: string, limit = 8): Airline[] {
   const q = query.trim().toLowerCase();
   if (!q) return AIRLINES.slice(0, limit);

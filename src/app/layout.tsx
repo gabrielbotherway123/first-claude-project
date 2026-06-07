@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 };
 
 // Set the theme class before paint to avoid a flash of the wrong theme.
-const themeScript = `(function(){try{var t=localStorage.getItem('theme')||'dark';if(t==='light')document.documentElement.classList.add('light');}catch(e){}})();`;
+const themeScript = `(function(){try{var t=localStorage.getItem('theme')||'light';if(t==='dark')document.documentElement.classList.add('dark');}catch(e){}})();`;
 
 export default function RootLayout({
   children,

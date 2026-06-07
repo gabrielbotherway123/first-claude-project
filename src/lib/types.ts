@@ -82,6 +82,8 @@ export interface TravelPlan {
   flightCost: number;
   hotelCost: number;
   totalCost: number;
+  pricesFetchedAt?: string; // ISO timestamp of when live prices were researched
+  sources?: string[]; // booking platforms referenced
 }
 
 export interface BookingDetails {

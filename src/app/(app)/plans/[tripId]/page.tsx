@@ -31,6 +31,17 @@ function stripCode(s: string) {
   return s.replace(/\s*\(.*\)/, "");
 }
 
+function fetchedLabel(iso?: string) {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
 export default function PlansPage({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = use(params);
   const router = useRouter();
@@ -188,7 +199,18 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                 <p className="text-2xl font-bold">{cur} {selectedPlan.totalCost.toLocaleString()}</p>
               </div>
             </div>
-            <p className="text-[var(--text-muted)] italic mb-6">{selectedPlan.justification}</p>
+            <p className="text-[var(--text-muted)] italic mb-3">{selectedPlan.justification}</p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-6 text-xs text-[var(--text-dim)]">
+              {selectedPlan.pricesFetchedAt && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
+                  Live prices · fetched {fetchedLabel(selectedPlan.pricesFetchedAt)}
+                </span>
+              )}
+              {selectedPlan.sources && selectedPlan.sources.length > 0 && (
+                <span>via {selectedPlan.sources.join(", ")}</span>
+              )}
+            </div>
 
             <div className="grid md:grid-cols-2 gap-5">
               <div>
@@ -276,6 +298,10 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
           {selected ? `Book ${selectedPlan?.label} →` : "Select an itinerary"}
         </Button>
       </div>
+
+      <p className="text-center text-xs text-[var(--text-dim)] mt-5">
+        Prices are live estimates and may change at checkout.
+      </p>
     </div>
   );
 }

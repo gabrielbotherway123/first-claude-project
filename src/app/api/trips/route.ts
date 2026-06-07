@@ -55,6 +55,8 @@ export async function POST(req: NextRequest) {
         flightCost: plan.flightCost,
         hotelCost: plan.hotelCost,
         totalCost: plan.totalCost,
+        pricesFetchedAt: plan.pricesFetchedAt ?? null,
+        sources: JSON.stringify(plan.sources ?? []),
       })),
     });
 
@@ -95,6 +97,8 @@ export async function GET(req: NextRequest) {
     flightCost: p.flightCost,
     hotelCost: p.hotelCost,
     totalCost: p.totalCost,
+    pricesFetchedAt: p.pricesFetchedAt,
+    sources: p.sources ? JSON.parse(p.sources) : [],
   }));
 
   return NextResponse.json({
