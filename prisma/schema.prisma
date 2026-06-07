@@ -124,15 +124,18 @@ model Plan {
   label         String
   justification String
 
-  flights String // JSON
-  hotel   String // JSON
+  flights  String // JSON
+  hotel    String // JSON
+  transfer String? // JSON ground-transport estimate
 
-  flightCost Float
-  hotelCost  Float
-  totalCost  Float
+  flightCost   Float
+  hotelCost    Float
+  transferCost Float @default(0)
+  totalCost    Float
 
-  pricesFetchedAt String? // ISO timestamp of live price research
-  sources         String? // JSON array of booking platforms
+  pricesFetchedAt String? // ISO timestamp of live price fetch
+  sources         String? // JSON array of data providers
+  dataNotes       String? // JSON array of components that could not be loaded live
 
   booking Booking?
 }

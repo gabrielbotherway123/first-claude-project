@@ -56,6 +56,7 @@ export interface FlightDetail {
   duration: string;
   price: number;
   isReturn?: boolean;
+  bookingLink?: string;
 }
 
 export interface HotelDetail {
@@ -71,6 +72,20 @@ export interface HotelDetail {
   cancellationPolicy: string;
   checkIn: string;
   checkOut: string;
+  bookingLink?: string;
+  rating?: number; // guest review score (0-10) when available
+}
+
+export interface TransferEstimate {
+  provider: string; // e.g. "Uber" or "Estimate"
+  product: string; // e.g. "UberX"
+  amount: number;
+  currency: string;
+  from: string;
+  to: string;
+  note?: string;
+  bookingLink?: string;
+  live: boolean; // true if a real fare estimate, false if heuristic
 }
 
 export interface TravelPlan {
@@ -79,11 +94,14 @@ export interface TravelPlan {
   justification: string;
   flights: FlightDetail[];
   hotel: HotelDetail;
+  transfer?: TransferEstimate;
   flightCost: number;
   hotelCost: number;
+  transferCost: number;
   totalCost: number;
-  pricesFetchedAt?: string; // ISO timestamp of when live prices were researched
-  sources?: string[]; // booking platforms referenced
+  pricesFetchedAt?: string; // ISO timestamp of when live prices were fetched
+  sources?: string[]; // data providers used
+  unavailable?: string[]; // components that could not be loaded live
 }
 
 export interface BookingDetails {

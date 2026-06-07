@@ -170,3 +170,11 @@ export function countryFor(formatted: string): string | undefined {
   if (!iata) return undefined;
   return BY_IATA.get(iata)?.country;
 }
+
+/** Resolves the city for a formatted airport string, falling back to the label. */
+export function cityFor(formatted: string): string {
+  const iata = extractIata(formatted);
+  const known = iata ? BY_IATA.get(iata) : undefined;
+  if (known) return known.city;
+  return formatted.replace(/\s*\(.*\)\s*$/, "").trim();
+}

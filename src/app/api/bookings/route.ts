@@ -83,8 +83,10 @@ export async function POST(req: NextRequest) {
         justification: booking.plan.justification,
         flights: JSON.parse(booking.plan.flights),
         hotel: JSON.parse(booking.plan.hotel),
+        transfer: booking.plan.transfer ? JSON.parse(booking.plan.transfer) : undefined,
         flightCost: booking.plan.flightCost,
         hotelCost: booking.plan.hotelCost,
+        transferCost: booking.plan.transferCost,
         totalCost: booking.plan.totalCost,
       },
     };

@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateTravelPlans } from "@/lib/ai";
-import { TripFormData } from "@/lib/types";
+import { buildItineraries } from "@/lib/itinerary";
+import { TripFormData, UserProfile, PreferredAirline } from "@/lib/types";
 import { auth } from "@/auth";
+
+function parseArr<T>(v: string | null): T[] {
+  if (!v) return [];
+  try {
+    const p = JSON.parse(v);
+    return Array.isArray(p) ? p : [];
+  } catch {
+    return [];
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,8 +23,25 @@ export async function POST(req: NextRequest) {
 
     const body: TripFormData = await req.json();
 
-    // Generate AI plans first
-    const plans = await generateTravelPlans(body);
+    // Load the user's saved preferences for loyalty matching.
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    const profile: UserProfile = {
+      id: session.user.id,
+      name: user?.name ?? body.fullName,
+      email: user?.email ?? body.email,
+      image: user?.image ?? null,
+      phone: user?.phone ?? body.phone,
+      defaultAirports: parseArr<string>(user?.defaultAirports ?? null),
+      preferredAirlines: parseArr<PreferredAirline>(user?.preferredAirlines ?? null),
+      defaultCabinClass: (user?.defaultCabinClass as UserProfile["defaultCabinClass"]) ?? "",
+      defaultHotelStars: user?.defaultHotelStars ?? null,
+      defaultLocationPreference:
+        (user?.defaultLocationPreference as UserProfile["defaultLocationPreference"]) ?? "",
+      standingRequirements: user?.standingRequirements ?? "",
+    };
+
+    // Build itineraries from live travel APIs (no AI).
+    const { plans, status } = await buildItineraries(body, profile);
 
     // Save trip to DB
     const trip = await prisma.trip.create({
@@ -52,19 +79,22 @@ export async function POST(req: NextRequest) {
         justification: plan.justification,
         flights: JSON.stringify(plan.flights),
         hotel: JSON.stringify(plan.hotel),
+        transfer: plan.transfer ? JSON.stringify(plan.transfer) : null,
         flightCost: plan.flightCost,
         hotelCost: plan.hotelCost,
+        transferCost: plan.transferCost,
         totalCost: plan.totalCost,
         pricesFetchedAt: plan.pricesFetchedAt ?? null,
         sources: JSON.stringify(plan.sources ?? []),
+        dataNotes: JSON.stringify(plan.unavailable ?? []),
       })),
     });
 
-    return NextResponse.json({ tripId: trip.id, plans });
+    return NextResponse.json({ tripId: trip.id, plans, status });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("POST /api/trips error:", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 }
 
@@ -94,11 +124,14 @@ export async function GET(req: NextRequest) {
     justification: p.justification,
     flights: JSON.parse(p.flights),
     hotel: JSON.parse(p.hotel),
+    transfer: p.transfer ? JSON.parse(p.transfer) : undefined,
     flightCost: p.flightCost,
     hotelCost: p.hotelCost,
+    transferCost: p.transferCost,
     totalCost: p.totalCost,
     pricesFetchedAt: p.pricesFetchedAt,
     sources: p.sources ? JSON.parse(p.sources) : [],
+    unavailable: p.dataNotes ? JSON.parse(p.dataNotes) : [],
   }));
 
   return NextResponse.json({

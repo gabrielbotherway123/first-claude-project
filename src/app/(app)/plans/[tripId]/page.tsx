@@ -240,6 +240,16 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                           via {f.layovers.map((l) => `${l.airport} (${l.duration})`).join(", ")}
                         </p>
                       )}
+                      {f.bookingLink && (
+                        <a
+                          href={f.bookingLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block mt-2 text-xs text-[var(--accent)] hover:underline"
+                        >
+                          View flight →
+                        </a>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -258,7 +268,12 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                         <p className="text-xs text-[var(--text-dim)]">{selectedPlan.hotel.brand}</p>
                       )}
                     </div>
-                    <span className="text-[var(--accent)] text-sm">{"★".repeat(selectedPlan.hotel.stars)}</span>
+                    <div className="text-right shrink-0">
+                      <span className="text-[var(--accent)] text-sm block">{"★".repeat(selectedPlan.hotel.stars)}</span>
+                      {selectedPlan.hotel.rating ? (
+                        <span className="text-xs text-[var(--success)]">{selectedPlan.hotel.rating.toFixed(1)}/10</span>
+                      ) : null}
+                    </div>
                   </div>
                   <p className="text-sm text-[var(--text-muted)] mt-1 mb-3">{selectedPlan.hotel.location}</p>
                   <div className="grid grid-cols-2 gap-2 text-xs text-[var(--text-muted)] mb-3">
@@ -277,9 +292,86 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                       ))}
                     </div>
                   )}
+                  {selectedPlan.hotel.bookingLink && (
+                    <a
+                      href={selectedPlan.hotel.bookingLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block mt-3 text-xs text-[var(--accent)] hover:underline"
+                    >
+                      {selectedPlan.hotelCost > 0 ? "Book on Booking.com →" : "Browse hotels on Booking.com →"}
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
+
+            {/* Ground transfer */}
+            {selectedPlan.transfer && (
+              <div className="mt-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)]">Airport transfer</h3>
+                  <span className="text-sm font-semibold">{cur} {selectedPlan.transferCost.toLocaleString()}</span>
+                </div>
+                <div className="glass rounded-xl p-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-sm">
+                      {selectedPlan.transfer.provider} · {selectedPlan.transfer.product}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                      {selectedPlan.transfer.from} → {selectedPlan.transfer.to}
+                    </p>
+                    {selectedPlan.transfer.note && (
+                      <p className="text-xs text-[var(--text-dim)] mt-1">{selectedPlan.transfer.note}</p>
+                    )}
+                  </div>
+                  {selectedPlan.transfer.bookingLink && (
+                    <a
+                      href={selectedPlan.transfer.bookingLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-[var(--accent)] hover:underline shrink-0"
+                    >
+                      {selectedPlan.transfer.live ? "Open Uber →" : "Estimate →"}
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Itemised totals */}
+            <div className="mt-5 glass rounded-xl p-4 flex flex-wrap items-end justify-between gap-4">
+              <div className="flex gap-6 text-sm">
+                <div>
+                  <span className="block text-xs text-[var(--text-dim)] uppercase">Flights</span>
+                  <span className="font-semibold">{cur} {selectedPlan.flightCost.toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="block text-xs text-[var(--text-dim)] uppercase">Hotel</span>
+                  <span className="font-semibold">{cur} {selectedPlan.hotelCost.toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="block text-xs text-[var(--text-dim)] uppercase">Transfer</span>
+                  <span className="font-semibold">{cur} {selectedPlan.transferCost.toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="block text-xs text-[var(--text-dim)] uppercase">Total</span>
+                <span className="font-bold text-xl text-[var(--accent)]">{cur} {selectedPlan.totalCost.toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* Could-not-load flags */}
+            {selectedPlan.unavailable && selectedPlan.unavailable.length > 0 && (
+              <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--bg-2)] px-4 py-3">
+                <p className="text-xs font-semibold text-[var(--text-muted)] mb-1">Some live data could not be loaded:</p>
+                <ul className="text-xs text-[var(--text-dim)] space-y-0.5">
+                  {selectedPlan.unavailable.map((u) => (
+                    <li key={u}>• {u}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
