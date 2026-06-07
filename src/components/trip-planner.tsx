@@ -504,9 +504,9 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
 
 function PlanningScreen() {
   const steps = [
-    "Finding flights (Amadeus)…",
-    "Searching hotels (Booking.com)…",
-    "Getting transfer prices (Uber)…",
+    "Searching flights…",
+    "Searching hotels…",
+    "Calculating transfers…",
     "Building five packages…",
   ];
   return (

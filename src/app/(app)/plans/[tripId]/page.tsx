@@ -204,7 +204,7 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
               {selectedPlan.pricesFetchedAt && (
                 <span className="inline-flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
-                  Live prices · fetched {fetchedLabel(selectedPlan.pricesFetchedAt)}
+                  Prices last updated: {new Date(selectedPlan.pricesFetchedAt).toLocaleString()} ({fetchedLabel(selectedPlan.pricesFetchedAt)})
                 </span>
               )}
               {selectedPlan.sources && selectedPlan.sources.length > 0 && (
