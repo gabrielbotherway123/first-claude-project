@@ -200,17 +200,11 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
               </div>
             </div>
             <p className="text-[var(--text-muted)] italic mb-3">{selectedPlan.justification}</p>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-6 text-xs text-[var(--text-dim)]">
-              {selectedPlan.pricesFetchedAt && (
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
-                  Prices last updated: {new Date(selectedPlan.pricesFetchedAt).toLocaleString()} ({fetchedLabel(selectedPlan.pricesFetchedAt)})
-                </span>
-              )}
-              {selectedPlan.sources && selectedPlan.sources.length > 0 && (
-                <span>via {selectedPlan.sources.join(", ")}</span>
-              )}
-            </div>
+            {selectedPlan.pricesFetchedAt && (
+              <div className="mb-6 text-xs text-[var(--text-dim)]">
+                Prices updated {fetchedLabel(selectedPlan.pricesFetchedAt)}
+              </div>
+            )}
 
             <div className="grid md:grid-cols-2 gap-5">
               <div>
@@ -361,17 +355,6 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
               </div>
             </div>
 
-            {/* Could-not-load flags */}
-            {selectedPlan.unavailable && selectedPlan.unavailable.length > 0 && (
-              <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--bg-2)] px-4 py-3">
-                <p className="text-xs font-semibold text-[var(--text-muted)] mb-1">Some live data could not be loaded:</p>
-                <ul className="text-xs text-[var(--text-dim)] space-y-0.5">
-                  {selectedPlan.unavailable.map((u) => (
-                    <li key={u}>• {u}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -392,7 +375,7 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
       </div>
 
       <p className="text-center text-xs text-[var(--text-dim)] mt-5">
-        Prices are live estimates and may change at checkout.
+        Prices are estimates and may change at checkout.
       </p>
     </div>
   );

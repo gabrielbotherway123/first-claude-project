@@ -45,9 +45,7 @@ export function AuthForm({
             {isSignup ? "Create your account" : "Welcome back"}
           </h1>
           <p className="text-[var(--text-muted)] text-sm">
-            {isSignup
-              ? "Start planning bespoke journeys in seconds."
-              : "Sign in to continue planning your travel."}
+            {isSignup ? "Start planning in seconds." : "Sign in to your account."}
           </p>
         </div>
 

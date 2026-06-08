@@ -72,9 +72,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
     >
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Profile & preferences</h1>
-        <p className="text-[var(--text-muted)] mt-1">
-          Saved here once, these details pre-fill every new trip you plan.
-        </p>
+        <p className="text-[var(--text-muted)] mt-1">Set once, applied to every trip.</p>
       </div>
 
       <GlassCard strong className="p-6 space-y-5">
@@ -92,9 +90,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
 
       <GlassCard strong className="p-6 space-y-4">
         <SectionTitle>Home airports</SectionTitle>
-        <p className="text-sm text-[var(--text-muted)] -mt-2">
-          Airports you frequently depart from. Shown as quick-select chips on the trip form.
-        </p>
+        <p className="text-sm text-[var(--text-muted)] -mt-2">Airports you fly from most often.</p>
         <div className="space-y-3">
           {airports.map((a, i) => (
             <div key={i} className="flex gap-2 items-start">
@@ -126,8 +122,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
       <GlassCard strong className="p-6 space-y-4">
         <SectionTitle>Airlines & rewards</SectionTitle>
         <p className="text-sm text-[var(--text-muted)] -mt-2">
-          Preferred carriers and your frequent-flyer numbers. Applied automatically when you
-          select that airline for a trip.
+          Your airlines and frequent-flyer numbers.
         </p>
         <div className="space-y-3">
           {airlines.map((a, i) => (

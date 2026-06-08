@@ -203,7 +203,7 @@ export function estimateHotels(params: {
   return tiers.map((t) => {
     const nightly = round5(baseUsd * t.mult * rate);
     return {
-      name: `Indicative ${params.stars}★ ${t.label} stay — ${params.city}`,
+      name: `${params.stars}★ ${t.label} stay · ${params.city}`,
       location: `${params.city} (central)`,
       address: "",
       stars: params.stars,

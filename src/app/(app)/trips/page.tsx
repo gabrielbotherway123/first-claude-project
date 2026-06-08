@@ -36,9 +36,7 @@ export default async function TripsPage() {
         <div className="glass-strong rounded-2xl p-12 text-center fade-in-up">
           <div className="text-5xl mb-4">🧭</div>
           <h2 className="text-xl font-semibold mb-2">No trips yet</h2>
-          <p className="text-[var(--text-muted)] mb-6">
-            Plan your first journey and it will be saved to your account.
-          </p>
+          <p className="text-[var(--text-muted)] mb-6">Plan your first journey to get started.</p>
           <Link href="/">
             <Button>Plan a trip</Button>
           </Link>

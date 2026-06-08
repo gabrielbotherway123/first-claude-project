@@ -209,14 +209,14 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
         className="text-center mb-12"
       >
         <p className="text-xs tracking-[0.35em] uppercase text-[var(--text-dim)] mb-4">
-          Bespoke Travel
+          Atlas
         </p>
         <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight mb-4 leading-[1.05]">
           Where to next,{" "}
           <span className="accent-text">{profile.name?.split(" ")[0] || "traveller"}</span>?
         </h1>
         <p className="text-[var(--text-muted)] max-w-md mx-auto text-lg leading-relaxed">
-          Tell us about your journey and receive five tailored itineraries.
+          Your next trip, planned in moments.
         </p>
       </motion.div>
 
@@ -507,7 +507,7 @@ function PlanningScreen() {
     "Searching flights…",
     "Searching hotels…",
     "Calculating transfers…",
-    "Building five packages…",
+    "Putting it together…",
   ];
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center px-4">
