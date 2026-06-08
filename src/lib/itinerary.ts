@@ -4,6 +4,7 @@ import { extractIata, cityFor, countryFor } from "@/lib/airports";
 import { searchFlights, type FlightOffer } from "@/lib/providers/amadeus";
 import { searchHotels, bookingSearchLink, type HotelOption } from "@/lib/providers/booking";
 import { getTransferEstimate } from "@/lib/providers/uber";
+import { rapidFlights, rapidHotels } from "@/lib/providers/rapidapi";
 import { estimateFlights, estimateHotels } from "@/lib/providers/estimate";
 import { scrapeFlights } from "@/lib/scrapers/flights";
 import { scrapeHotels } from "@/lib/scrapers/hotels";
@@ -128,25 +129,66 @@ export async function buildItineraries(
       ])
     : [{ ok: false as const, error: "Scraping disabled" }, { ok: false as const, error: "Scraping disabled" }, null];
 
-  // ── Flights: scraped → Amadeus fallback → fail ──
+  // Kick off the RapidAPI flight + hotel lookups concurrently (when not scraping)
+  // so the whole build is ~max(flights, hotels), not the sum.
+  const rapidFlightsP = scrapingEnabled
+    ? null
+    : rapidFlights({
+        origin,
+        destination,
+        departureDate: trip.departureDate,
+        returnDate: trip.returnDate || undefined,
+        adults: trip.numberOfTravellers,
+        cabinClass: trip.cabinClass,
+        currency: trip.currency,
+      });
+  const rapidHotelsP = scrapingEnabled
+    ? null
+    : rapidHotels({
+        city: destCity,
+        checkIn,
+        checkOut,
+        adults: trip.numberOfTravellers,
+        stars: trip.hotelStarRating,
+        currency: trip.currency,
+        nights: trip.numberOfNights || 1,
+      });
+
+  // ── Flights: scraped → RapidAPI → Amadeus → estimate ──
   let offers: FlightOffer[];
   let flightSource: string;
   if (flightScrape.ok && flightScrape.data.length > 0) {
     offers = flightScrape.data;
     flightSource = "Google Flights (scraped)";
   } else {
-    const api = await searchFlights({
-      origin,
-      destination,
-      departureDate: trip.departureDate,
-      returnDate: trip.returnDate || undefined,
-      adults: trip.numberOfTravellers,
-      cabinClass: trip.cabinClass,
-      currency: trip.currency,
-    });
-    if (api.ok && api.data.length > 0) {
+    const rapid = rapidFlightsP
+      ? await rapidFlightsP
+      : await rapidFlights({
+          origin,
+          destination,
+          departureDate: trip.departureDate,
+          returnDate: trip.returnDate || undefined,
+          adults: trip.numberOfTravellers,
+          cabinClass: trip.cabinClass,
+          currency: trip.currency,
+        });
+    const api = rapid.ok && rapid.data.length > 0
+      ? rapid
+      : await searchFlights({
+          origin,
+          destination,
+          departureDate: trip.departureDate,
+          returnDate: trip.returnDate || undefined,
+          adults: trip.numberOfTravellers,
+          cabinClass: trip.cabinClass,
+          currency: trip.currency,
+        });
+    if (rapid.ok && rapid.data.length > 0) {
+      offers = rapid.data;
+      flightSource = "Booking.com flights";
+    } else if (api.ok && api.data.length > 0) {
       offers = api.data;
-      flightSource = "Amadeus (fallback)";
+      flightSource = "Amadeus";
     } else {
       // No key + scrape blocked → indicative estimate so the app still works.
       offers = estimateFlights({
@@ -173,16 +215,32 @@ export async function buildItineraries(
     liveHotels = hotelScrape.data;
     hotelSource = "Booking.com (scraped)";
   } else {
-    const api = await searchHotels({
-      city: destCity,
-      checkIn,
-      checkOut,
-      adults: trip.numberOfTravellers,
-      stars: trip.hotelStarRating,
-      currency: trip.currency,
-      nights: trip.numberOfNights || 1,
-    });
-    if (api.ok && api.data.length > 0) {
+    const rapid = rapidHotelsP
+      ? await rapidHotelsP
+      : await rapidHotels({
+          city: destCity,
+          checkIn,
+          checkOut,
+          adults: trip.numberOfTravellers,
+          stars: trip.hotelStarRating,
+          currency: trip.currency,
+          nights: trip.numberOfNights || 1,
+        });
+    const api = rapid.ok && rapid.data.length > 0
+      ? rapid
+      : await searchHotels({
+          city: destCity,
+          checkIn,
+          checkOut,
+          adults: trip.numberOfTravellers,
+          stars: trip.hotelStarRating,
+          currency: trip.currency,
+          nights: trip.numberOfNights || 1,
+        });
+    if (rapid.ok && rapid.data.length > 0) {
+      liveHotels = rapid.data;
+      hotelSource = "Booking.com";
+    } else if (api.ok && api.data.length > 0) {
       liveHotels = api.data;
       hotelSource = "Booking.com (API)";
     } else {

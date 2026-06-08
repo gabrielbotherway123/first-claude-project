@@ -46,3 +46,6 @@ next-env.d.ts
 # local sqlite database
 *.db
 *.db-journal
+
+# Claude Code local settings (may contain command history)
+.claude/settings.local.json
