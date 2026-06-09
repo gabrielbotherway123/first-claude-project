@@ -28,7 +28,7 @@ async function sendViaResend(
   await resend.emails.send({
     from: "Atlas Travel <noreply@yourdomain.com>",
     to: [to],
-    subject: `Booking Confirmed — Reference ${reference}`,
+    subject: `Your Atlas itinerary — ${reference}`,
     html,
     text,
   });
@@ -47,14 +47,14 @@ function buildEmailHtml(booking: BookingDetails): string {
     <tr>
       <td style="background:#0a1628;padding:32px;text-align:center;border-radius:8px 8px 0 0">
         <p style="color:#c9a84c;font-size:12px;letter-spacing:4px;margin:0 0 8px">ATLAS</p>
-        <h1 style="color:#ffffff;font-size:24px;margin:0">Booking Confirmed</h1>
+        <h1 style="color:#ffffff;font-size:24px;margin:0">Your itinerary is ready</h1>
         <p style="color:#c9a84c;font-size:18px;margin:8px 0 0;letter-spacing:2px">${reference}</p>
       </td>
     </tr>
     <tr>
       <td style="background:#ffffff;padding:32px;border:1px solid #e8e4d9;border-top:none">
         <p style="color:#0a1628;font-size:16px;margin:0 0 24px">Dear ${trip.fullName},</p>
-        <p style="color:#4a5568;margin:0 0 24px">Your executive travel itinerary has been confirmed. Please find your booking details below.</p>
+        <p style="color:#4a5568;margin:0 0 24px">Here is your planned itinerary. Complete each booking with our travel partners — full details below.</p>
 
         <div style="background:#fdfaf5;border:1px solid #e8e4d9;border-radius:8px;padding:20px;margin-bottom:24px">
           <h2 style="color:#0a1628;font-size:16px;margin:0 0 16px;display:flex;align-items:center">
@@ -118,11 +118,11 @@ function buildEmailText(booking: BookingDetails): string {
   const outbound = plan.flights.find((f) => !f.isReturn);
   const returnFlight = plan.flights.find((f) => f.isReturn);
 
-  return `BOOKING CONFIRMED — ${reference}
+  return `YOUR ATLAS ITINERARY — ${reference}
 
 Dear ${trip.fullName},
 
-Your executive travel itinerary has been confirmed.
+Here is your planned itinerary. Complete each booking with our travel partners.
 
 FLIGHT DETAILS (${plan.label})
 ${outbound ? `Outbound: ${outbound.airline} ${outbound.flightNumber} — ${outbound.departure.airport} ${outbound.departure.time} → ${outbound.arrival.airport} ${outbound.arrival.time}` : ""}

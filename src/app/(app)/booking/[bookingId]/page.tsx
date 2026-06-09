@@ -1,125 +1,125 @@
-"use client";
-
-import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui";
-import { FlightDetail, HotelDetail } from "@/lib/types";
+import type { FlightDetail, HotelDetail, TransferEstimate } from "@/lib/types";
 
-interface BookingData {
-  id: string;
-  reference: string;
-  createdAt: string;
-  status: string;
-  trip: {
-    fullName: string;
-    email: string;
-    phone: string;
-    originCity: string;
-    destinations: string[];
-    departureDate: string;
-    returnDate: string;
-    numberOfNights: number;
-    totalBudget: number;
-    currency: string;
-    numberOfTravellers: number;
-    cabinClass: string;
-    tripPurpose: string;
-  };
-  plan: {
-    label: string;
-    justification: string;
-    flights: FlightDetail[];
-    hotel: HotelDetail;
-    flightCost: number;
-    hotelCost: number;
-    totalCost: number;
-  };
-}
+export const metadata = { title: "Complete your booking · Atlas" };
 
 function stripCode(s: string) {
   return s.replace(/\s*\(.*\)/, "");
 }
 
-export default function BookingPage({ params }: { params: Promise<{ bookingId: string }> }) {
-  const { bookingId } = use(params);
-  const router = useRouter();
-  const [booking, setBooking] = useState<BookingData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+export default async function BookingPage({
+  params,
+}: {
+  params: Promise<{ bookingId: string }>;
+}) {
+  const { bookingId } = await params;
+  const session = await auth();
+  if (!session?.user?.id) redirect("/sign-in");
 
-  useEffect(() => {
-    fetch(`/api/bookings/${bookingId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) throw new Error(data.error);
-        setBooking(data);
-      })
-      .catch((err) => setError(err.message ?? "Failed to load booking"))
-      .finally(() => setLoading(false));
-  }, [bookingId]);
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { trip: true, plan: true },
+  });
 
-  if (loading) {
-    return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-          className="w-12 h-12 rounded-full border-2 border-[var(--border)] border-t-[var(--accent)] mb-4"
-        />
-        <p className="text-[var(--text-muted)]">Loading your booking…</p>
-      </div>
-    );
-  }
-
-  if (error || !booking) {
+  if (!booking || booking.trip.userId !== session.user.id) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center gap-4">
-        <p className="text-[var(--danger)]">{error || "Booking not found"}</p>
-        <Button variant="outline" onClick={() => router.push("/")}>← Start over</Button>
+        <p className="text-[var(--danger)]">Booking not found.</p>
+        <Link href="/">
+          <Button variant="outline">← Start over</Button>
+        </Link>
       </div>
     );
   }
 
   const cur = booking.trip.currency;
-  const outbound = booking.plan.flights.find((f) => !f.isReturn);
-  const returnFlight = booking.plan.flights.find((f) => f.isReturn);
+  const destinations: string[] = JSON.parse(booking.trip.destinations);
+  const flights: FlightDetail[] = JSON.parse(booking.plan.flights);
+  const hotel: HotelDetail = JSON.parse(booking.plan.hotel);
+  const transfer: TransferEstimate | null = booking.plan.transfer
+    ? JSON.parse(booking.plan.transfer)
+    : null;
+  const outbound = flights.find((f) => !f.isReturn);
+  const returnFlight = flights.find((f) => f.isReturn);
+
+  const flightLink = outbound?.bookingLink;
+  const hotelLink = hotel.bookingLink;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      {/* Success */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4 }}
-        className="glass-strong rounded-2xl p-8 text-center mb-6"
-      >
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.15, type: "spring", stiffness: 260, damping: 18 }}
-          className="w-16 h-16 rounded-full accent-gradient mx-auto mb-5 flex items-center justify-center"
-        >
-          <svg className="w-8 h-8 text-[var(--accent-contrast)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-          </svg>
-        </motion.div>
-        <h1 className="text-2xl font-semibold mb-2">Your trip is confirmed</h1>
-        <p className="text-[var(--text-muted)] mb-5">
-          A confirmation has been sent to <strong className="text-[var(--text)]">{booking.trip.email}</strong>
+    <div className="max-w-3xl mx-auto px-4 py-8 fade-in-up">
+      {/* Header */}
+      <div className="glass-strong rounded-2xl p-8 text-center mb-6">
+        <p className="text-xs tracking-[0.3em] uppercase text-[var(--accent)] mb-3">Itinerary ready</p>
+        <h1 className="text-2xl sm:text-3xl font-semibold mb-2">
+          {stripCode(booking.trip.originCity)} → {destinations.map(stripCode).join(" → ")}
+        </h1>
+        <p className="text-[var(--text-muted)] max-w-md mx-auto">
+          Everything's planned and pre-filled. Complete each booking securely with our partners —
+          your dates and details carry across.
         </p>
-        <div className="inline-block glass rounded-xl px-6 py-3">
-          <p className="text-xs tracking-[0.3em] uppercase text-[var(--accent)] mb-1">Reference</p>
-          <p className="text-2xl font-bold font-mono tracking-[0.2em]">{booking.reference}</p>
-        </div>
-      </motion.div>
+        <p className="text-xs text-[var(--text-dim)] mt-4">
+          Atlas reference <span className="font-mono">{booking.reference}</span>
+        </p>
+      </div>
 
+      {/* Primary hand-off */}
+      <div className="glass-strong rounded-2xl p-6 mb-6">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-4">
+          Complete your booking
+        </h2>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {hotelLink && (
+            <a href={hotelLink} target="_blank" rel="noopener noreferrer" className="block">
+              <div className="glass rounded-xl p-4 h-full flex flex-col justify-between hover:border-[var(--accent)] transition-colors">
+                <div>
+                  <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">Hotel</p>
+                  <p className="font-semibold leading-tight">{hotel.name}</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">
+                    {cur} {hotel.totalCost.toLocaleString()} · {booking.trip.numberOfNights} nights
+                  </p>
+                </div>
+                <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold accent-gradient text-[var(--accent-contrast)] rounded-lg px-3 py-2 justify-center">
+                  Reserve on Booking.com →
+                </span>
+              </div>
+            </a>
+          )}
+          {flightLink && (
+            <a href={flightLink} target="_blank" rel="noopener noreferrer" className="block">
+              <div className="glass rounded-xl p-4 h-full flex flex-col justify-between hover:border-[var(--accent)] transition-colors">
+                <div>
+                  <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">Flights</p>
+                  <p className="font-semibold leading-tight">
+                    {outbound?.airline}
+                    {returnFlight ? " · return" : ""}
+                  </p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">
+                    {cur} {booking.plan.flightCost.toLocaleString()} · {booking.trip.numberOfTravellers} pax
+                  </p>
+                </div>
+                <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold glass border border-[var(--border-strong)] rounded-lg px-3 py-2 justify-center">
+                  Book flights →
+                </span>
+              </div>
+            </a>
+          )}
+        </div>
+        <p className="text-xs text-[var(--text-dim)] mt-3">
+          You'll complete payment on the partner's own site. Prices are live estimates and may
+          change at checkout.
+        </p>
+      </div>
+
+      {/* Summary */}
       <div className="grid sm:grid-cols-2 gap-4 mb-4">
         <div className="glass-strong rounded-2xl p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">Trip</h2>
           <div className="space-y-2 text-sm">
             <Row label="Traveller" value={booking.trip.fullName} />
-            <Row label="Route" value={`${stripCode(booking.trip.originCity)} → ${booking.trip.destinations.map(stripCode).join(" → ")}`} />
             <Row label="Dates" value={`${booking.trip.departureDate} → ${booking.trip.returnDate}`} />
             <Row label="Nights" value={`${booking.trip.numberOfNights}`} />
             <Row label="Party" value={`${booking.trip.numberOfTravellers} × ${booking.trip.cabinClass}`} />
@@ -128,9 +128,7 @@ export default function BookingPage({ params }: { params: Promise<{ bookingId: s
         </div>
 
         <div className="glass-strong rounded-2xl p-5">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">Plan</h2>
-          <p className="font-semibold text-lg">{booking.plan.label}</p>
-          <p className="text-sm text-[var(--text-muted)] italic mb-4">{booking.plan.justification}</p>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">{booking.plan.label}</h2>
           <div className="glass rounded-xl p-4 text-sm space-y-2">
             <div className="flex justify-between text-[var(--text-muted)]">
               <span>Flights</span><span className="text-[var(--text)]">{cur} {booking.plan.flightCost.toLocaleString()}</span>
@@ -138,8 +136,13 @@ export default function BookingPage({ params }: { params: Promise<{ bookingId: s
             <div className="flex justify-between text-[var(--text-muted)]">
               <span>Hotel ({booking.trip.numberOfNights}n)</span><span className="text-[var(--text)]">{cur} {booking.plan.hotelCost.toLocaleString()}</span>
             </div>
+            {transfer && (
+              <div className="flex justify-between text-[var(--text-muted)]">
+                <span>Transfer</span><span className="text-[var(--text)]">{cur} {booking.plan.transferCost.toLocaleString()}</span>
+              </div>
+            )}
             <div className="flex justify-between pt-2 border-t border-[var(--border)]">
-              <span className="font-semibold">Total</span>
+              <span className="font-semibold">Estimated total</span>
               <span className="font-bold text-[var(--accent)]">{cur} {booking.plan.totalCost.toLocaleString()}</span>
             </div>
           </div>
@@ -161,33 +164,27 @@ export default function BookingPage({ params }: { params: Promise<{ bookingId: s
         <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-4">Hotel</h2>
         <div className="flex items-start justify-between mb-3">
           <div>
-            <p className="font-semibold text-lg">{booking.plan.hotel.name}</p>
-            {booking.plan.hotel.brand && <p className="text-sm text-[var(--text-dim)]">{booking.plan.hotel.brand}</p>}
-            <p className="text-[var(--text-muted)] mt-1">{booking.plan.hotel.location}</p>
+            <p className="font-semibold text-lg">{hotel.name}</p>
+            <p className="text-[var(--text-muted)] mt-1">{hotel.location}</p>
           </div>
-          <span className="text-[var(--accent)]">{"★".repeat(booking.plan.hotel.stars)}</span>
+          <span className="text-[var(--accent)]">{"★".repeat(hotel.stars)}</span>
         </div>
-        <div className="grid sm:grid-cols-3 gap-3 text-sm">
-          <InfoBox label="Check-in" value={booking.plan.hotel.checkIn} />
-          <InfoBox label="Check-out" value={booking.plan.hotel.checkOut} />
-          <InfoBox label="Per night" value={`${cur} ${booking.plan.hotel.nightlyRate.toLocaleString()}`} />
+        <div className="grid sm:grid-cols-3 gap-3 text-sm mb-4">
+          <InfoBox label="Check-in" value={hotel.checkIn} />
+          <InfoBox label="Check-out" value={hotel.checkOut} />
+          <InfoBox label="Per night" value={`${cur} ${hotel.nightlyRate.toLocaleString()}`} />
         </div>
-        {booking.plan.hotel.amenities.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-4">
-            {booking.plan.hotel.amenities.map((a) => (
-              <span key={a} className="px-2.5 py-1 rounded-full text-xs glass text-[var(--text-muted)]">{a}</span>
-            ))}
-          </div>
+        {hotelLink && (
+          <a href={hotelLink} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--accent)] hover:underline">
+            Reserve on Booking.com →
+          </a>
         )}
       </div>
 
       <div className="text-center">
-        <p className="text-sm text-[var(--text-muted)] mb-5">
-          Keep reference <strong className="text-[var(--text)] font-mono">{booking.reference}</strong> for your records.
-        </p>
         <div className="flex items-center justify-center gap-3">
-          <Button variant="outline" onClick={() => router.push("/trips")}>My trips</Button>
-          <Button onClick={() => router.push("/")}>Plan another trip</Button>
+          <Link href="/trips"><Button variant="outline">My trips</Button></Link>
+          <Link href="/"><Button>Plan another trip</Button></Link>
         </div>
       </div>
     </div>
