@@ -1,7 +1,7 @@
 import "server-only";
 import type { FlightDetail } from "@/lib/types";
 import { AIRLINES, nationalCarrier, type Airline } from "@/lib/airlines";
-import { bookingSearchLink, type HotelOption } from "@/lib/providers/booking";
+import { bookingSearchLink, bookingFlightLink, type HotelOption } from "@/lib/providers/booking";
 import type { FlightOffer } from "@/lib/providers/amadeus";
 
 // ─── No-key indicative engine ───────────────────────────────────────────────
@@ -128,9 +128,14 @@ export function estimateFlights(params: {
   const premium =
     AIRLINES.find((a) => ["EK", "QR", "SQ", "CX"].includes(a.code)) ?? primary;
 
-  const link = `https://www.google.com/travel/flights?q=${encodeURIComponent(
-    `Flights from ${params.origin} to ${params.destination} on ${params.departureDate}`
-  )}`;
+  const link = bookingFlightLink({
+    origin: params.origin,
+    destination: params.destination,
+    departureDate: params.departureDate,
+    returnDate: params.returnDate,
+    adults: params.adults,
+    cabinClass: params.cabinClass,
+  });
 
   // 5 indicative variants the package builder can rank.
   const variants = [

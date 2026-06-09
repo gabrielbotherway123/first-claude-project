@@ -42,6 +42,35 @@ export function bookingSearchLink(opts: {
 }
 
 /**
+ * Booking.com Flights deep-link, pre-filled with the route, dates, cabin and
+ * party. Keeps the whole trip on one site (Booking.com does flights too) under
+ * the same affiliate id.
+ */
+export function bookingFlightLink(opts: {
+  origin: string; // IATA
+  destination: string; // IATA
+  departureDate: string;
+  returnDate?: string;
+  adults: number;
+  cabinClass: "economy" | "business" | "first";
+}): string {
+  const aid = process.env.BOOKING_AFFILIATE_ID;
+  const from = `${opts.origin}.AIRPORT`;
+  const to = `${opts.destination}.AIRPORT`;
+  const qs = new URLSearchParams({
+    type: opts.returnDate ? "ROUNDTRIP" : "ONEWAY",
+    adults: String(opts.adults),
+    cabinClass: opts.cabinClass.toUpperCase(),
+    from,
+    to,
+    depart: opts.departureDate,
+  });
+  if (opts.returnDate) qs.set("return", opts.returnDate);
+  if (aid) qs.set("aid", aid);
+  return `https://flights.booking.com/flights/${from}-${to}/?${qs.toString()}`;
+}
+
+/**
  * Searches real hotel availability via the Booking.com Demand API. Requires
  * partner approval + a Demand API token (BOOKING_API_TOKEN). Until that is in
  * place this returns a clear error and the caller falls back to affiliate

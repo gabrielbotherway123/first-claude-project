@@ -58,8 +58,8 @@ export default async function BookingPage({
           {stripCode(booking.trip.originCity)} → {destinations.map(stripCode).join(" → ")}
         </h1>
         <p className="text-[var(--text-muted)] max-w-md mx-auto">
-          Everything's planned and pre-filled. Complete each booking securely with our partners —
-          your dates and details carry across.
+          Everything's planned and pre-filled. Book your flights and hotel on Booking.com —
+          your dates and details carry straight across.
         </p>
         <p className="text-xs text-[var(--text-dim)] mt-4">
           Atlas reference <span className="font-mono">{booking.reference}</span>
@@ -102,14 +102,14 @@ export default async function BookingPage({
                   </p>
                 </div>
                 <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold glass border border-[var(--border-strong)] rounded-lg px-3 py-2 justify-center">
-                  Book flights →
+                  Book flights on Booking.com →
                 </span>
               </div>
             </a>
           )}
         </div>
         <p className="text-xs text-[var(--text-dim)] mt-3">
-          You'll complete payment on the partner's own site. Prices are live estimates and may
+          You'll complete payment securely on Booking.com. Prices are live estimates and may
           change at checkout.
         </p>
       </div>

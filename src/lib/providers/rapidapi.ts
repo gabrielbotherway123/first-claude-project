@@ -1,7 +1,7 @@
 import "server-only";
 import type { FlightDetail } from "@/lib/types";
 import type { FlightOffer } from "@/lib/providers/amadeus";
-import type { HotelOption } from "@/lib/providers/booking";
+import { bookingFlightLink, type HotelOption } from "@/lib/providers/booking";
 import { cached, cacheGet, cacheSet } from "@/lib/cache";
 import { ProviderResult, isConfigured } from "./types";
 
@@ -135,9 +135,14 @@ export async function rapidFlights(params: {
         priceBreakdown?: { total?: { units?: number; nanos?: number; currencyCode?: string } };
       }[];
 
-      const link = `https://www.google.com/travel/flights?q=${encodeURIComponent(
-        `Flights from ${params.origin} to ${params.destination} on ${params.departureDate}`
-      )}`;
+      const link = bookingFlightLink({
+        origin: params.origin,
+        destination: params.destination,
+        departureDate: params.departureDate,
+        returnDate: params.returnDate,
+        adults: params.adults,
+        cabinClass: params.cabinClass,
+      });
 
       const mapped: FlightOffer[] = offers.slice(0, 15).map((o) => {
         const total = (o.priceBreakdown?.total?.units ?? 0) + (o.priceBreakdown?.total?.nanos ?? 0) / 1e9;
