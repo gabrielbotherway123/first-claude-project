@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         departureDate: booking.trip.departureDate,
         returnDate: booking.trip.returnDate,
         numberOfNights: booking.trip.numberOfNights,
-        totalBudget: booking.trip.totalBudget,
+        totalBudget: booking.trip.totalBudget ?? undefined,
         currency: booking.trip.currency,
         numberOfTravellers: booking.trip.numberOfTravellers,
         cabinClass: booking.trip.cabinClass as "economy" | "business" | "first",

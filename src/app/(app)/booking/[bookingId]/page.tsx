@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui";
+import { bookingSearchLink } from "@/lib/providers/booking";
 import type { FlightDetail, HotelDetail, TransferEstimate } from "@/lib/types";
 
 export const metadata = { title: "Complete your booking · Atlas" };
@@ -46,8 +47,17 @@ export default async function BookingPage({
   const outbound = flights.find((f) => !f.isReturn);
   const returnFlight = flights.find((f) => f.isReturn);
 
-  const flightLink = outbound?.bookingLink;
-  const hotelLink = hotel.bookingLink;
+  // Deep checkout links carried on the plan: the exact flight (via Booking's
+  // offer token) and the exact hotel/room — pre-loaded, details-and-pay.
+  // Fall back to a pre-filled search when a deep link isn't available.
+  const fallbackLink = bookingSearchLink({
+    city: stripCode(destinations[0] ?? ""),
+    checkIn: booking.trip.departureDate,
+    checkOut: booking.trip.returnDate,
+    adults: booking.trip.numberOfTravellers,
+  });
+  const hotelCheckout = hotel.bookingLink || fallbackLink;
+  const flightCheckout = outbound?.bookingLink || fallbackLink;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 fade-in-up">
@@ -58,8 +68,8 @@ export default async function BookingPage({
           {stripCode(booking.trip.originCity)} → {destinations.map(stripCode).join(" → ")}
         </h1>
         <p className="text-[var(--text-muted)] max-w-md mx-auto">
-          Everything's planned and pre-filled. Book your flights and hotel on Booking.com —
-          your dates and details carry straight across.
+          Your flights and room are pre-loaded in Booking.com's checkout — just enter your
+          details to complete each purchase.
         </p>
         <p className="text-xs text-[var(--text-dim)] mt-4">
           Atlas reference <span className="font-mono">{booking.reference}</span>
@@ -72,45 +82,33 @@ export default async function BookingPage({
           Complete your booking
         </h2>
         <div className="grid sm:grid-cols-2 gap-3">
-          {hotelLink && (
-            <a href={hotelLink} target="_blank" rel="noopener noreferrer" className="block">
-              <div className="glass rounded-xl p-4 h-full flex flex-col justify-between hover:border-[var(--accent)] transition-colors">
-                <div>
-                  <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">Hotel</p>
-                  <p className="font-semibold leading-tight">{hotel.name}</p>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">
-                    {cur} {hotel.totalCost.toLocaleString()} · {booking.trip.numberOfNights} nights
-                  </p>
-                </div>
-                <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold accent-gradient text-[var(--accent-contrast)] rounded-lg px-3 py-2 justify-center">
-                  Reserve on Booking.com →
-                </span>
-              </div>
-            </a>
-          )}
-          {flightLink && (
-            <a href={flightLink} target="_blank" rel="noopener noreferrer" className="block">
-              <div className="glass rounded-xl p-4 h-full flex flex-col justify-between hover:border-[var(--accent)] transition-colors">
-                <div>
-                  <p className="text-xs text-[var(--text-dim)] uppercase tracking-wider mb-1">Flights</p>
-                  <p className="font-semibold leading-tight">
-                    {outbound?.airline}
-                    {returnFlight ? " · return" : ""}
-                  </p>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">
-                    {cur} {booking.plan.flightCost.toLocaleString()} · {booking.trip.numberOfTravellers} pax
-                  </p>
-                </div>
-                <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold glass border border-[var(--border-strong)] rounded-lg px-3 py-2 justify-center">
-                  Book flights on Booking.com →
-                </span>
-              </div>
-            </a>
-          )}
+          <a
+            href={flightCheckout}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex flex-col items-center justify-center gap-1 rounded-xl px-6 py-4 accent-gradient text-[var(--accent-contrast)] shadow-lg hover:brightness-110 transition-all"
+          >
+            <span className="text-base font-semibold">Buy flights →</span>
+            <span className="text-xs opacity-80">
+              {outbound?.airline} · {cur} {booking.plan.flightCost.toLocaleString()}
+            </span>
+          </a>
+          <a
+            href={hotelCheckout}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex flex-col items-center justify-center gap-1 rounded-xl px-6 py-4 accent-gradient text-[var(--accent-contrast)] shadow-lg hover:brightness-110 transition-all"
+          >
+            <span className="text-base font-semibold">Buy hotel →</span>
+            <span className="text-xs opacity-80">
+              {hotel.name.length > 28 ? `${hotel.name.slice(0, 28)}…` : hotel.name} · {cur}{" "}
+              {booking.plan.hotelCost.toLocaleString()}
+            </span>
+          </a>
         </div>
         <p className="text-xs text-[var(--text-dim)] mt-3">
-          You'll complete payment securely on Booking.com. Prices are live estimates and may
-          change at checkout.
+          Each opens Booking.com's checkout with your selection, dates and guests pre-loaded —
+          enter your details to pay. Prices are live estimates and may change at checkout.
         </p>
       </div>
 
@@ -174,11 +172,6 @@ export default async function BookingPage({
           <InfoBox label="Check-out" value={hotel.checkOut} />
           <InfoBox label="Per night" value={`${cur} ${hotel.nightlyRate.toLocaleString()}`} />
         </div>
-        {hotelLink && (
-          <a href={hotelLink} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--accent)] hover:underline">
-            Reserve on Booking.com →
-          </a>
-        )}
       </div>
 
       <div className="text-center">

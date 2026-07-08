@@ -15,10 +15,23 @@ interface TripData {
   returnDate: string;
   numberOfNights: number;
   currency: string;
-  totalBudget: number;
+  totalBudget?: number | null;
   numberOfTravellers: number;
   cabinClass: string;
   preferredAirline?: string | null;
+  airlineNote?: string | null;
+}
+
+/** Single Booking.com link with destination, dates and guests pre-filled. */
+function bookingComboLink(trip: TripData): string {
+  const dest = stripCode(trip.destinations[0] ?? "");
+  const qs = new URLSearchParams({
+    ss: dest,
+    checkin: trip.departureDate,
+    checkout: trip.returnDate,
+    group_adults: String(trip.numberOfTravellers),
+  });
+  return `https://www.booking.com/searchresults.html?${qs.toString()}`;
 }
 
 interface PlanWithId extends TravelPlan {
@@ -123,22 +136,28 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
           <span className="text-[var(--text-muted)]">{trip.departureDate} – {trip.returnDate}</span>
           <span className="text-[var(--text-dim)]">·</span>
           <span className="text-[var(--text-muted)]">{trip.numberOfTravellers} pax · {trip.cabinClass}</span>
-          <span className="ml-auto text-[var(--accent)] font-medium">
-            Budget {cur} {trip.totalBudget.toLocaleString()}
-          </span>
+          {trip.totalBudget ? (
+            <span className="ml-auto text-[var(--accent)] font-medium">
+              Budget {cur} {trip.totalBudget.toLocaleString()}
+            </span>
+          ) : null}
         </motion.div>
       )}
 
       <div className="text-center mb-8">
         <p className="text-xs tracking-[0.3em] uppercase text-[var(--accent)] mb-2">Five options</p>
         <h1 className="text-3xl font-semibold tracking-tight">Choose your itinerary</h1>
+        {trip?.airlineNote && (
+          <p className="text-sm text-[var(--text-muted)] mt-3">{trip.airlineNote}</p>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-5 sm:grid-cols-2 gap-4 mb-8">
         {plans.map((plan, i) => {
           const outbound = plan.flights.find((f) => !f.isReturn);
           const isSel = selected === plan.id;
-          const overBudget = trip ? plan.totalCost > trip.totalBudget : false;
+          const hasBudget = Boolean(trip?.totalBudget);
+          const overBudget = trip?.totalBudget ? plan.totalCost > trip.totalBudget : false;
           return (
             <motion.button
               key={plan.id}
@@ -170,9 +189,11 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                 <p className="text-lg font-bold">
                   {cur} {plan.totalCost.toLocaleString()}
                 </p>
-                <p className={`text-xs ${overBudget ? "text-[var(--danger)]" : "text-[var(--success)]"}`}>
-                  {overBudget ? "Over budget" : "Within budget"}
-                </p>
+                {hasBudget && (
+                  <p className={`text-xs ${overBudget ? "text-[var(--danger)]" : "text-[var(--success)]"}`}>
+                    {overBudget ? "Over budget" : "Within budget"}
+                  </p>
+                )}
               </div>
             </motion.button>
           );
@@ -234,16 +255,6 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                           via {f.layovers.map((l) => `${l.airport} (${l.duration})`).join(", ")}
                         </p>
                       )}
-                      {f.bookingLink && (
-                        <a
-                          href={f.bookingLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-block mt-2 text-xs text-[var(--accent)] hover:underline"
-                        >
-                          View flight →
-                        </a>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -286,16 +297,6 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                       ))}
                     </div>
                   )}
-                  {selectedPlan.hotel.bookingLink && (
-                    <a
-                      href={selectedPlan.hotel.bookingLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block mt-3 text-xs text-[var(--accent)] hover:underline"
-                    >
-                      {selectedPlan.hotelCost > 0 ? "Book on Booking.com →" : "Browse hotels on Booking.com →"}
-                    </a>
-                  )}
                 </div>
               </div>
             </div>
@@ -319,16 +320,6 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                       <p className="text-xs text-[var(--text-dim)] mt-1">{selectedPlan.transfer.note}</p>
                     )}
                   </div>
-                  {selectedPlan.transfer.bookingLink && (
-                    <a
-                      href={selectedPlan.transfer.bookingLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-[var(--accent)] hover:underline shrink-0"
-                    >
-                      {selectedPlan.transfer.live ? "Open Uber →" : "Estimate →"}
-                    </a>
-                  )}
                 </div>
               </div>
             )}
@@ -355,6 +346,17 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
               </div>
             </div>
 
+            {/* Single combined Booking.com hand-off */}
+            {trip && (
+              <a
+                href={bookingComboLink(trip)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-5 w-full inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-semibold accent-gradient text-[var(--accent-contrast)] shadow-lg hover:brightness-110 transition-all"
+              >
+                View & Book on Booking.com →
+              </a>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

@@ -50,7 +50,7 @@ function buildDefaults(profile: UserProfile): TripFormData {
     departureDate: "",
     returnDate: "",
     numberOfNights: 0,
-    totalBudget: 0, // blank — no placeholder amount
+    totalBudget: undefined, // blank — optional
     currency: "GBP",
     numberOfTravellers: 1,
     cabinClass: "economy", // Economy is the default
@@ -176,19 +176,25 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
       return setError("Please fill in all destination fields.");
     if (!form.departureDate || !form.returnDate)
       return setError("Please choose your travel dates.");
-    if (!form.totalBudget || form.totalBudget <= 0)
-      return setError("Please enter a budget.");
     if (!form.tripPurpose) return setError("Please select the purpose of your trip.");
 
     setLoading(true);
     try {
-      const res = await fetch("/api/trips", {
+      const request = fetch("/api/trips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
+      }).then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Failed to generate itineraries");
+        return data;
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to generate itineraries");
+      // Hold the premium loading sequence for a minimum so it feels deliberate,
+      // even when results come back faster. Errors still surface immediately.
+      const [data] = await Promise.all([
+        request,
+        new Promise((r) => setTimeout(r, 4500)),
+      ]);
       localStorage.removeItem(DRAFT_KEY);
       router.push(`/plans/${data.tripId}`);
     } catch (err) {
@@ -349,7 +355,7 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
                   type="number"
                   min={0}
                   value={form.totalBudget ? form.totalBudget : ""}
-                  onChange={(e) => set("totalBudget", e.target.value ? parseFloat(e.target.value) : 0)}
+                  onChange={(e) => set("totalBudget", e.target.value ? parseFloat(e.target.value) : undefined)}
                 />
                 <Select
                   label="Currency"
@@ -502,35 +508,95 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
   );
 }
 
+const PLANNING_STEPS = [
+  "Searching available flights...",
+  "Checking airline availability...",
+  "Finding hotels near your destination...",
+  "Calculating transfer times...",
+  "Building your itinerary options...",
+];
+
 function PlanningScreen() {
-  const steps = [
-    "Searching flights…",
-    "Searching hotels…",
-    "Calculating transfers…",
-    "Putting it together…",
-  ];
+  // `done` advances one step at a time; the final step stays active until the
+  // results are ready and the page navigates away.
+  const [done, setDone] = useState(0);
+  useEffect(() => {
+    const id = setInterval(
+      () => setDone((d) => Math.min(d + 1, PLANNING_STEPS.length - 1)),
+      850
+    );
+    return () => clearInterval(id);
+  }, []);
+
   return (
-    <div className="min-h-[70vh] flex flex-col items-center justify-center px-4">
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ repeat: Infinity, duration: 2.2, ease: "linear" }}
-        className="w-16 h-16 rounded-full border-2 border-[var(--border)] border-t-[var(--accent)] mb-8"
-      />
-      <p className="text-xs tracking-[0.3em] uppercase text-[var(--text-dim)] mb-2">One moment</p>
-      <h2 className="text-2xl font-semibold mb-8">Designing your journey</h2>
-      <div className="space-y-2.5">
-        {steps.map((s, i) => (
-          <motion.div
-            key={s}
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.7 }}
-            className="flex items-center gap-3 text-sm text-[var(--text-muted)]"
-          >
-            <span className="w-1.5 h-1.5 rounded-full accent-gradient" />
-            {s}
-          </motion.div>
-        ))}
+    <div className="min-h-[75vh] flex flex-col items-center justify-center px-4">
+      {/* Pulsing concierge orb */}
+      <div className="relative mb-10 flex items-center justify-center">
+        <motion.div
+          animate={{ scale: [1, 1.3, 1], opacity: [0.45, 0.12, 0.45] }}
+          transition={{ repeat: Infinity, duration: 2.4, ease: "easeInOut" }}
+          className="absolute w-24 h-24 rounded-full accent-gradient blur-2xl"
+        />
+        <motion.div
+          animate={{ scale: [1, 1.06, 1] }}
+          transition={{ repeat: Infinity, duration: 2.4, ease: "easeInOut" }}
+          className="relative w-20 h-20 rounded-full accent-gradient flex items-center justify-center text-3xl text-[var(--accent-contrast)] shadow-xl"
+        >
+          ✈
+        </motion.div>
+      </div>
+
+      <p className="text-xs tracking-[0.3em] uppercase text-[var(--text-dim)] mb-2">
+        Your concierge is working
+      </p>
+      <h2 className="text-2xl font-semibold mb-8">Planning your trip</h2>
+
+      <div className="w-full max-w-sm space-y-3">
+        {PLANNING_STEPS.map((s, i) => {
+          if (i > done) return null;
+          const complete = i < done;
+          return (
+            <motion.div
+              key={s}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+              className="flex items-center gap-3"
+            >
+              <span className="w-5 h-5 shrink-0 flex items-center justify-center">
+                {complete ? (
+                  <motion.svg
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 420, damping: 16 }}
+                    className="w-5 h-5 text-[var(--success)]"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </motion.svg>
+                ) : (
+                  <motion.span
+                    animate={{ scale: [1, 1.5, 1], opacity: [1, 0.4, 1] }}
+                    transition={{ repeat: Infinity, duration: 1.1, ease: "easeInOut" }}
+                    className="w-2 h-2 rounded-full accent-gradient"
+                  />
+                )}
+              </span>
+              <span
+                className={`text-sm transition-colors ${
+                  complete
+                    ? "text-[var(--text-muted)]"
+                    : "text-[var(--text)] font-medium"
+                }`}
+              >
+                {s}
+              </span>
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );

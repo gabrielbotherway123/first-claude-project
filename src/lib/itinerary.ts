@@ -1,6 +1,7 @@
 import "server-only";
 import type { TripFormData, UserProfile, TravelPlan, HotelDetail, FlightDetail } from "@/lib/types";
 import { extractIata, cityFor, countryFor } from "@/lib/airports";
+import { findAirline } from "@/lib/airlines";
 import { searchFlights, type FlightOffer } from "@/lib/providers/amadeus";
 import { searchHotels, bookingSearchLink, type HotelOption } from "@/lib/providers/booking";
 import { getTransferEstimate } from "@/lib/providers/uber";
@@ -25,6 +26,7 @@ export interface ItineraryResult {
     flights: { source: string };
     hotels: { source: string; ok: boolean };
     transfer: { source: string; live: boolean };
+    airlineNote?: string;
   };
 }
 
@@ -201,9 +203,29 @@ export async function buildItineraries(
         currency: trip.currency,
         originCountry,
         destinationCountry,
+        preferredAirline: trip.preferredAirline || undefined,
       });
       flightSource = "Indicative estimate";
       flightsEstimated = true;
+    }
+  }
+
+  // ── Airline filter: when a preferred airline is chosen, restrict every
+  // package to it. Only fall back to other carriers if real results genuinely
+  // have none on this route/date (estimated offers always carry the preferred
+  // airline, so they're never filtered out).
+  let airlineNote: string | undefined;
+  const preferred = trip.preferredAirline?.trim();
+  if (preferred) {
+    const pa = findAirline(preferred);
+    const matches = (o: FlightOffer) =>
+      o.airlines.some((n) => n.toLowerCase() === preferred.toLowerCase()) ||
+      (pa ? o.airlineCodes.includes(pa.code) : false);
+    const onPreferred = offers.filter(matches);
+    if (onPreferred.length > 0) {
+      offers = onPreferred;
+    } else if (!flightsEstimated) {
+      airlineNote = `No ${preferred} flights available for this route — showing next best option`;
     }
   }
 
@@ -284,27 +306,53 @@ export async function buildItineraries(
     valueScored[0].o,
   ];
 
-  // ── Rank hotels ──
-  const hotelByPrice = [...liveHotels].sort((a, b) => a.totalCost - b.totalCost);
-  const hotelByRating = [...liveHotels].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-  const hotelFlexible = liveHotels.find((h) => /free cancellation|refundable/i.test(h.cancellationPolicy));
-  const hotelValue = (() => {
-    if (liveHotels.length === 0) return undefined;
-    const hp = valueRank(liveHotels, (h) => h.totalCost);
-    const hr = valueRank(liveHotels, (h) => -(h.rating ?? 0));
-    return [...liveHotels]
-      .map((h, i) => ({ h, score: 0.5 * hp[i] + 0.5 * hr[i] }))
-      .sort((a, b) => a.score - b.score)[0].h;
-  })();
+  // ── Rank hotels: QUALITY first (review score + stars), then price within
+  // budget. The target user is a business executive, so even the cheapest
+  // package picks a well-reviewed quality hotel, not a budget room. ──
+  const minStars = Math.max(3, trip.hotelStarRating || 4);
+  const MIN_REVIEW = 8.0;
+  // Single total budget acts as a loose upper bound on the hotel component.
+  const hotelBudget = trip.totalBudget && trip.totalBudget > 0 ? trip.totalBudget : undefined;
+
+  // Prefer hotels meeting the quality bar; if none do, fall back to the best
+  // available by review so we never show a poor hotel.
+  const meetsBar = liveHotels.filter((h) => h.stars >= minStars && (h.rating ?? 0) >= MIN_REVIEW);
+  const qualityPool =
+    meetsBar.length > 0
+      ? meetsBar
+      : [...liveHotels].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 6);
+
+  // Respect the hotel budget if set, but never drop below the quality pool.
+  const withinBudget = hotelBudget ? qualityPool.filter((h) => h.totalCost <= hotelBudget) : qualityPool;
+  const pool = withinBudget.length > 0 ? withinBudget : qualityPool;
+
+  // Quality score (higher is better): review score dominates, stars second.
+  const reviewN = valueRank(pool, (h) => -(h.rating ?? 0)); // 0 = best reviewed
+  const starN = valueRank(pool, (h) => -h.stars);
+  const priceN = valueRank(pool, (h) => h.totalCost); // 0 = cheapest
+  const qualityScore = pool.map((_, i) => 0.6 * reviewN[i] + 0.4 * starN[i]); // lower = better
+
+  const byQuality = [...pool].sort(
+    (a, b) => qualityScore[pool.indexOf(a)] - qualityScore[pool.indexOf(b)]
+  );
+  const byRating = [...pool].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  const cheapestQuality = [...pool].sort((a, b) => a.totalCost - b.totalCost);
+  const flexible = pool.find((h) => /free cancellation|refundable/i.test(h.cancellationPolicy));
+  // Best value = quality with mild price weighting, still quality-led.
+  const byValue = [...pool].sort((a, b) => {
+    const sa = 0.7 * qualityScore[pool.indexOf(a)] + 0.3 * priceN[pool.indexOf(a)];
+    const sb = 0.7 * qualityScore[pool.indexOf(b)] + 0.3 * priceN[pool.indexOf(b)];
+    return sa - sb;
+  });
 
   function hotelFor(i: number): HotelDetail {
-    if (liveHotels.length === 0) return placeholderHotel(trip, destCity, checkIn, checkOut);
+    if (pool.length === 0) return placeholderHotel(trip, destCity, checkIn, checkOut);
     const pick =
-      i === 0 ? hotelByPrice[0]
-      : i === 1 ? hotelByPrice[0]
-      : i === 2 ? hotelByRating[0]
-      : i === 3 ? (hotelFlexible ?? hotelByPrice[0])
-      : (hotelValue ?? hotelByPrice[0]);
+      i === 0 ? cheapestQuality[0] // lowest cost — but still from the quality pool
+      : i === 1 ? byQuality[0] // fastest travel pairs with a top central hotel
+      : i === 2 ? byRating[0] // best rated
+      : i === 3 ? (flexible ?? byQuality[0]) // most flexible
+      : byValue[0]; // best overall value
     return hotelFromOption(pick, checkIn, checkOut);
   }
 
@@ -352,6 +400,7 @@ export async function buildItineraries(
       flights: { source: flightSource },
       hotels: { source: hotelSource, ok: hotelOk },
       transfer: { source: transferSource, live: transfer.live },
+      airlineNote,
     },
   };
 }

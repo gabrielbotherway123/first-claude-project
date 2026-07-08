@@ -1,6 +1,6 @@
 import "server-only";
 import type { FlightDetail } from "@/lib/types";
-import { AIRLINES, nationalCarrier, type Airline } from "@/lib/airlines";
+import { AIRLINES, nationalCarrier, findAirline, type Airline } from "@/lib/airlines";
 import { bookingSearchLink, bookingFlightLink, type HotelOption } from "@/lib/providers/booking";
 import type { FlightOffer } from "@/lib/providers/amadeus";
 
@@ -115,6 +115,7 @@ export function estimateFlights(params: {
   currency: string;
   originCountry?: string;
   destinationCountry?: string;
+  preferredAirline?: string;
 }): FlightOffer[] {
   const b = band(params.originCountry, params.destinationCountry);
   const rate = fx(params.currency);
@@ -123,10 +124,12 @@ export function estimateFlights(params: {
   const tripFactor = roundTrip ? 1 : 0.6;
   const basePerPerson = b.usd * cabin * tripFactor * rate;
 
-  const primary = nationalCarrier(params.originCountry) ?? AIRLINES[0];
-  const secondary = nationalCarrier(params.destinationCountry) ?? AIRLINES[1];
+  // When a preferred airline is set, every estimated option flies that carrier.
+  const forced = params.preferredAirline ? findAirline(params.preferredAirline) : undefined;
+  const primary = forced ?? nationalCarrier(params.originCountry) ?? AIRLINES[0];
+  const secondary = forced ?? nationalCarrier(params.destinationCountry) ?? AIRLINES[1];
   const premium =
-    AIRLINES.find((a) => ["EK", "QR", "SQ", "CX"].includes(a.code)) ?? primary;
+    forced ?? AIRLINES.find((a) => ["EK", "QR", "SQ", "CX"].includes(a.code)) ?? primary;
 
   const link = bookingFlightLink({
     origin: params.origin,
@@ -199,22 +202,23 @@ export function estimateHotels(params: {
     stars: params.stars,
   });
 
+  // Business-quality tiers — all well-reviewed (8.0+) and central.
   const tiers = [
-    { mult: 0.85, rating: 7.9, label: "Value", cancel: "Check cancellation terms when booking" },
-    { mult: 1.0, rating: 8.5, label: "Central", cancel: "Free cancellation available on most rooms" },
-    { mult: 1.3, rating: 9.1, label: "Premium", cancel: "Check cancellation terms when booking" },
+    { mult: 0.92, rating: 8.2, label: "Business", cancel: "Free cancellation available on most rooms" },
+    { mult: 1.1, rating: 8.7, label: "Executive", cancel: "Free cancellation available on most rooms" },
+    { mult: 1.35, rating: 9.2, label: "Premier", cancel: "Check cancellation terms when booking" },
   ];
 
   return tiers.map((t) => {
     const nightly = round5(baseUsd * t.mult * rate);
     return {
       name: `${params.stars}★ ${t.label} stay · ${params.city}`,
-      location: `${params.city} (central)`,
+      location: `${params.city} (central business district)`,
       address: "",
       stars: params.stars,
       nightlyRate: nightly,
       totalCost: nightly * nights,
-      amenities: ["WiFi", "Breakfast"],
+      amenities: ["High-speed WiFi", "Work desk", "Gym", "Room service"],
       rating: t.rating,
       cancellationPolicy: t.cancel,
       bookingLink: link,

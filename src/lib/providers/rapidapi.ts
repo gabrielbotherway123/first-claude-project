@@ -131,11 +131,12 @@ export async function rapidFlights(params: {
       }
 
       const offers = (data.flightOffers ?? []) as {
+        token?: string;
         segments: RapidSegment[];
         priceBreakdown?: { total?: { units?: number; nanos?: number; currencyCode?: string } };
       }[];
 
-      const link = bookingFlightLink({
+      const searchLink = bookingFlightLink({
         origin: params.origin,
         destination: params.destination,
         departureDate: params.departureDate,
@@ -143,8 +144,23 @@ export async function rapidFlights(params: {
         adults: params.adults,
         cabinClass: params.cabinClass,
       });
+      const aid = process.env.BOOKING_AFFILIATE_ID;
 
       const mapped: FlightOffer[] = offers.slice(0, 15).map((o) => {
+        // Each offer carries a Booking.com token — deep-link straight to THAT
+        // flight's checkout (passenger details → pay) instead of a search page.
+        const deepQs = new URLSearchParams({
+          type: params.returnDate ? "ROUNDTRIP" : "ONEWAY",
+          adults: String(params.adults),
+          cabinClass: params.cabinClass.toUpperCase(),
+          depart: params.departureDate,
+        });
+        if (params.returnDate) deepQs.set("return", params.returnDate);
+        if (aid) deepQs.set("aid", aid);
+        const link = o.token
+          ? `https://flights.booking.com/flights/${params.origin}.AIRPORT-${params.destination}.AIRPORT/${o.token}/?${deepQs.toString()}`
+          : searchLink;
+
         const total = (o.priceBreakdown?.total?.units ?? 0) + (o.priceBreakdown?.total?.nanos ?? 0) / 1e9;
         const segs = o.segments ?? [];
         const flights = segs.map((s, i) => segmentToFlight(s, i > 0, total / Math.max(1, segs.length), link));
@@ -210,6 +226,10 @@ export async function rapidHotels(params: {
       if (!dest) return { ok: false as const, error: `Couldn't resolve destination "${params.city}".` };
 
       const aid = process.env.BOOKING_AFFILIATE_ID;
+      const minStars = Math.max(3, params.stars || 4);
+      // Star-class filter at the query level (class::4,class::5 etc.) so the API
+      // returns hotels at or above the requested rating.
+      const classFilter = Array.from({ length: 5 - minStars + 1 }, (_, i) => `class::${minStars + i}`).join(",");
       const qs = new URLSearchParams({
         dest_id: dest.destId,
         search_type: dest.searchType,
@@ -220,28 +240,53 @@ export async function rapidHotels(params: {
         page_number: "1",
         currency_code: params.currency,
         units: "metric",
+        sort_by: "class_descending",
+        categories_filter_ids: classFilter,
       });
       const json = await getJson(`https://${HOST}/api/v1/hotels/searchHotels?${qs.toString()}`);
       const data = json.data as { hotels?: unknown } | string | undefined;
       if (typeof data !== "object" || data === null || !Array.isArray(data.hotels)) {
         return { ok: false as const, error: "Hotels API returned no data (challenge/rate limit)." };
       }
-      const rows = (data.hotels ?? []) as { property: Record<string, unknown> }[];
       const nights = params.nights || 1;
+      // Exclude non-hotel property types (executives don't want hostels/B&Bs).
+      const EXCLUDE = /hostel|backpacker|guest\s*house|guesthouse|bed (and|&) breakfast|\bb&b\b|dormitory|campsite|caravan|motel/i;
+      const rows = (data.hotels ?? [])
+        .filter((r: { property?: { name?: unknown } }) => !EXCLUDE.test(String(r.property?.name ?? "")))
+        .slice(0, 15) as { hotel_id?: number; property: Record<string, unknown> }[];
 
-      const hotels: HotelOption[] = rows.slice(0, 12).map(({ property: p }) => {
+      const hotels: HotelOption[] = rows.map(({ hotel_id, property: p }) => {
         const price = Number(
           ((p.priceBreakdown as { grossPrice?: { value?: number } } | undefined)?.grossPrice?.value) ?? 0
         );
         const stars = Number((p.accuratePropertyClass as number) || (p.propertyClass as number) || params.stars);
         const name = String(p.name ?? "Hotel");
-        const bookingLink = `https://www.booking.com/searchresults.html?${new URLSearchParams({
-          ss: name,
-          checkin: params.checkIn,
-          checkout: params.checkOut,
-          group_adults: String(params.adults),
-          ...(aid ? { aid } : {}),
-        }).toString()}`;
+        // Deep-link into Booking.com's checkout for THIS hotel, dates and room
+        // pre-selected — the guest just enters their details and pays. Falls
+        // back to a pre-filled hotel search if we lack a hotel_id.
+        const blockIds = (p.blockIds as string[] | undefined) ?? [];
+        let bookingLink: string;
+        if (hotel_id) {
+          const bookQs = new URLSearchParams({
+            hotel_id: String(hotel_id),
+            checkin: params.checkIn,
+            checkout: params.checkOut,
+            group_adults: String(params.adults),
+            group_children: "0",
+            no_rooms: "1",
+          });
+          if (blockIds[0]) bookQs.set(`nr_rooms_${blockIds[0]}`, "1");
+          if (aid) bookQs.set("aid", aid);
+          bookingLink = `https://secure.booking.com/book.html?${bookQs.toString()}`;
+        } else {
+          bookingLink = `https://www.booking.com/searchresults.html?${new URLSearchParams({
+            ss: name,
+            checkin: params.checkIn,
+            checkout: params.checkOut,
+            group_adults: String(params.adults),
+            ...(aid ? { aid } : {}),
+          }).toString()}`;
+        }
         return {
           name,
           location: params.city,

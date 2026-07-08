@@ -9,8 +9,8 @@ export interface TripFormData {
   departureDate: string;
   returnDate: string;
   numberOfNights: number;
-  // Budget
-  totalBudget: number;
+  // Budget — single optional total (0/undefined = no constraint)
+  totalBudget?: number;
   currency: string;
   // Travel class
   numberOfTravellers: number;
