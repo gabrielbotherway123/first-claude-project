@@ -44,7 +44,6 @@ export default async function TripsPage() {
 
       {trips.length === 0 ? (
         <div className="glass-strong rounded-2xl p-12 text-center fade-in-up">
-          <div className="text-5xl mb-4">🧭</div>
           <h2 className="text-xl font-semibold mb-2">No trips yet</h2>
           <p className="text-[var(--text-muted)] mb-6">Plan your first journey to get started.</p>
           <Link href="/">
@@ -69,9 +68,7 @@ export default async function TripsPage() {
                   className="glass-strong rounded-2xl p-5 flex items-center gap-5 hover:border-[var(--accent)] transition-colors fade-in-up"
                   style={{ animationDelay: `${i * 0.05}s` }}
                 >
-                  <div className="w-12 h-12 rounded-xl accent-gradient flex items-center justify-center text-[var(--accent-contrast)] text-xl shrink-0">
-                    ✈
-                  </div>
+                  <div className="w-12 h-12 rounded-xl accent-gradient shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold truncate">
                       {trip.originCity.replace(/\s*\(.*\)/, "")} →{" "}
@@ -128,9 +125,7 @@ export default async function TripsPage() {
                   className="glass-strong rounded-2xl p-5 flex items-center gap-5 hover:border-[var(--accent)] transition-colors fade-in-up"
                   style={{ animationDelay: `${i * 0.05}s` }}
                 >
-                  <div className="w-12 h-12 rounded-xl accent-gradient flex items-center justify-center text-[var(--accent-contrast)] text-xl shrink-0">
-                    ✈
-                  </div>
+                  <div className="w-12 h-12 rounded-xl accent-gradient shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold truncate">
                       {order.originCity} → {order.destinationCity}
@@ -174,9 +169,7 @@ export default async function TripsPage() {
                   className="glass-strong rounded-2xl p-5 flex items-center gap-5 hover:border-[var(--accent)] transition-colors fade-in-up"
                   style={{ animationDelay: `${i * 0.05}s` }}
                 >
-                  <div className="w-12 h-12 rounded-xl accent-gradient flex items-center justify-center text-[var(--accent-contrast)] text-xl shrink-0">
-                    ⌂
-                  </div>
+                  <div className="w-12 h-12 rounded-xl accent-gradient shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold truncate">{order.accommodationName}</p>
                     <p className="text-sm text-[var(--text-dim)]">

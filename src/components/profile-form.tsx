@@ -10,6 +10,7 @@ import type { PreferredAirline, UserProfile } from "@/lib/types";
 
 const CABINS = [
   { value: "economy", label: "Economy" },
+  { value: "premium_economy", label: "Premium" },
   { value: "business", label: "Business" },
   { value: "first", label: "First" },
 ];
@@ -17,6 +18,11 @@ const LOCATIONS = [
   { value: "city_centre", label: "City centre" },
   { value: "airport", label: "Near airport" },
   { value: "flexible", label: "Flexible" },
+];
+const AMENITIES = [
+  "Gym", "Spa", "Pool", "Restaurant", "Bar", "Concierge",
+  "Business Centre", "Room Service", "Parking", "Airport Shuttle",
+  "Valet", "Laundry", "High-Speed WiFi",
 ];
 
 export function ProfileForm({ profile }: { profile: UserProfile }) {
@@ -33,7 +39,12 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
   const [cabin, setCabin] = useState(profile.defaultCabinClass);
   const [stars, setStars] = useState<number | null>(profile.defaultHotelStars);
   const [location, setLocation] = useState(profile.defaultLocationPreference);
+  const [amenities, setAmenities] = useState<string[]>(profile.defaultAmenities ?? []);
   const [requirements, setRequirements] = useState(profile.standingRequirements);
+
+  function toggleAmenity(a: string) {
+    setAmenities((prev) => (prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]));
+  }
 
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -56,6 +67,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
         defaultCabinClass: cabin,
         defaultHotelStars: stars,
         defaultLocationPreference: location,
+        defaultAmenities: amenities,
         standingRequirements: requirements,
       });
       setSaved(true);
@@ -172,7 +184,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
         <div>
           <FieldLabel>Preferred hotel rating</FieldLabel>
           <Segmented
-            options={[3, 4, 5].map((s) => ({ value: String(s), label: `${s}★` }))}
+            options={[3, 4, 5].map((s) => ({ value: String(s), label: `${s} star` }))}
             value={stars ? String(stars) : ""}
             onChange={(v) => setStars(v ? Number(v) : null)}
           />
@@ -184,6 +196,31 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
             value={location}
             onChange={(v) => setLocation(v as UserProfile["defaultLocationPreference"])}
           />
+        </div>
+        <div>
+          <FieldLabel>Preferred amenities</FieldLabel>
+          <p className="text-xs text-[var(--text-dim)] -mt-1 mb-2">
+            Pre-selected on every new trip.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {AMENITIES.map((a) => {
+              const selected = amenities.includes(a);
+              return (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => toggleAmenity(a)}
+                  className={`px-3 py-1.5 rounded-full text-sm border transition-all ${
+                    selected
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]"
+                      : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]"
+                  }`}
+                >
+                  {a}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <FloatingTextarea
           label="Standing special requirements"
@@ -205,7 +242,7 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
               exit={{ opacity: 0 }}
               className="text-sm text-[var(--success)]"
             >
-              ✓ Saved
+              Saved
             </motion.span>
           )}
         </AnimatePresence>

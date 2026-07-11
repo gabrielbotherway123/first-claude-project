@@ -4,11 +4,14 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui";
+import { FlightBooking, type FlightsPrefill } from "@/components/flight-booking";
 import { TravelPlan } from "@/lib/types";
 
 interface TripData {
   id: string;
   fullName: string;
+  email: string;
+  phone: string;
   originCity: string;
   destinations: string[];
   departureDate: string;
@@ -17,16 +20,65 @@ interface TripData {
   currency: string;
   totalBudget?: number | null;
   numberOfTravellers: number;
+  numberOfChildren: number;
   cabinClass: string;
   preferredAirline?: string | null;
   airlineNote?: string | null;
+}
+
+interface FlightsConfig {
+  flightsConfigured: boolean;
+  flightsLiveMode: boolean;
 }
 
 interface PlanWithId extends TravelPlan {
   id: string;
 }
 
-const PLAN_ICONS = ["◇", "⚡", "♛", "↻", "★"];
+/** Google Calendar "add event" template link for the whole trip. */
+function googleCalendarUrl(trip: TripData, plan: PlanWithId): string {
+  const start = trip.departureDate.replace(/-/g, "");
+  // Google treats the end date as exclusive for all-day events — add a day.
+  const endBase = trip.returnDate || trip.departureDate;
+  const end = new Date(endBase);
+  end.setDate(end.getDate() + 1);
+  const endStr = end.toISOString().slice(0, 10).replace(/-/g, "");
+  const dest = trip.destinations.map(stripCode).join(", ");
+  const outbound = plan.flights.find((f) => !f.isReturn);
+  const details =
+    `Atlas itinerary — ${plan.label}\n` +
+    `Route: ${stripCode(trip.originCity)} → ${dest}\n` +
+    (outbound ? `Outbound: ${outbound.airline} ${outbound.flightNumber} at ${outbound.departure.time}\n` : "") +
+    `Hotel: ${plan.hotel.name}\n` +
+    `Estimated total: ${trip.currency} ${plan.totalCost.toLocaleString()}`;
+  const qs = new URLSearchParams({
+    action: "TEMPLATE",
+    text: `Trip to ${dest}`,
+    dates: `${start}/${endStr}`,
+    details,
+    location: dest,
+  });
+  return `https://calendar.google.com/calendar/render?${qs.toString()}`;
+}
+
+/** Share the itinerary via the native share sheet, falling back to email. */
+async function shareItinerary(trip: TripData, plan: PlanWithId) {
+  const dest = trip.destinations.map(stripCode).join(", ");
+  const text =
+    `My Atlas trip to ${dest} (${trip.departureDate} – ${trip.returnDate}).\n` +
+    `${plan.label} · estimated total ${trip.currency} ${plan.totalCost.toLocaleString()}.`;
+  const nav = navigator as Navigator & { share?: (data: ShareData) => Promise<void> };
+  if (typeof nav.share === "function") {
+    try {
+      await nav.share({ title: `Trip to ${dest}`, text });
+      return;
+    } catch {
+      /* user cancelled or share failed — fall through to email */
+    }
+  }
+  window.location.href = `mailto:?subject=${encodeURIComponent(`Trip to ${dest}`)}&body=${encodeURIComponent(text)}`;
+}
+
 
 function stripCode(s: string) {
   return s.replace(/\s*\(.*\)/, "");
@@ -48,7 +100,9 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
   const router = useRouter();
   const [trip, setTrip] = useState<TripData | null>(null);
   const [plans, setPlans] = useState<PlanWithId[]>([]);
+  const [config, setConfig] = useState<FlightsConfig>({ flightsConfigured: false, flightsLiveMode: false });
   const [selected, setSelected] = useState<string | null>(null);
+  const [bookingOpen, setBookingOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState("");
@@ -60,10 +114,17 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
         if (data.error) throw new Error(data.error);
         setTrip(data.trip);
         setPlans(data.plans);
+        if (data.config) setConfig(data.config);
       })
       .catch(() => setError("Failed to load itineraries"))
       .finally(() => setLoading(false));
   }, [tripId]);
+
+  // Collapse the inline booking flow whenever a different itinerary is chosen.
+  function choosePlan(id: string) {
+    setSelected(id);
+    setBookingOpen(false);
+  }
 
   async function handleBook() {
     if (!selected) return;
@@ -150,7 +211,7 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
             <motion.button
               key={plan.id}
               type="button"
-              onClick={() => setSelected(plan.id)}
+              onClick={() => choosePlan(plan.id)}
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.06 }}
@@ -160,8 +221,10 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
               }`}
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xl accent-text">{PLAN_ICONS[i]}</span>
-                {isSel && <span className="text-[var(--accent)] text-xs font-bold">✓</span>}
+                <span className="w-6 h-6 rounded-full glass flex items-center justify-center text-xs font-bold accent-text">
+                  {i + 1}
+                </span>
+                {isSel && <span className="text-[var(--accent)] text-xs font-bold uppercase tracking-wider">Selected</span>}
               </div>
               <h3 className="font-semibold text-sm mb-2 leading-tight">{plan.label}</h3>
               {outbound && (
@@ -171,7 +234,7 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                 </p>
               )}
               <p className="text-xs text-[var(--text-dim)] mb-3 truncate">
-                {"★".repeat(plan.hotel.stars)} {plan.hotel.name}
+                {plan.hotel.stars}-star · {plan.hotel.name}
               </p>
               <div className="pt-3 border-t border-[var(--border)]">
                 <p className="text-lg font-bold">
@@ -238,9 +301,12 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                         <span className="text-xs text-[var(--text-dim)]">{f.arrival.time}</span>
                         <span className="font-bold">{stripCode(f.arrival.airport)}</span>
                       </div>
-                      {f.layovers.length > 0 && (
-                        <p className="text-xs text-[var(--text-dim)] mt-1">
-                          via {f.layovers.map((l) => `${l.airport} (${l.duration})`).join(", ")}
+                      {f.layovers.length === 0 ? (
+                        <p className="text-xs text-[var(--success)] mt-1">Direct flight</p>
+                      ) : (
+                        <p className="text-xs text-[var(--accent)] mt-1">
+                          {f.layovers.length === 1 ? "Connects in " : "Connects via "}
+                          {f.layovers.map((l) => `${stripCode(l.airport)} (${l.duration})`).join(", ")}
                         </p>
                       )}
                     </div>
@@ -262,7 +328,7 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                       )}
                     </div>
                     <div className="text-right shrink-0">
-                      <span className="text-[var(--accent)] text-sm block">{"★".repeat(selectedPlan.hotel.stars)}</span>
+                      <span className="text-[var(--accent)] text-sm font-semibold block">{selectedPlan.hotel.stars}-star</span>
                       {selectedPlan.hotel.rating ? (
                         <span className="text-xs text-[var(--success)]">{selectedPlan.hotel.rating.toFixed(1)}/10</span>
                       ) : null}
@@ -334,6 +400,59 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
               </div>
             </div>
 
+            {/* Book on this screen + calendar / share */}
+            {trip && (
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                {config.flightsConfigured && (
+                  <Button onClick={() => setBookingOpen((o) => !o)}>
+                    {bookingOpen ? "Hide flight booking" : "Book this flight in Atlas →"}
+                  </Button>
+                )}
+                <a
+                  href={googleCalendarUrl(trip, selectedPlan)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 rounded-xl text-sm border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] transition-all"
+                >
+                  Add to Google Calendar
+                </a>
+                <button
+                  type="button"
+                  onClick={() => shareItinerary(trip, selectedPlan)}
+                  className="inline-flex items-center px-4 py-2 rounded-xl text-sm border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] transition-all"
+                >
+                  Share with family
+                </button>
+              </div>
+            )}
+
+            {/* Inline Duffel flight booking — book without leaving this screen */}
+            <AnimatePresence>
+              {bookingOpen && trip && config.flightsConfigured && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-4 border-t border-[var(--border)] pt-2 overflow-hidden"
+                >
+                  <FlightBooking
+                    configured={config.flightsConfigured}
+                    liveMode={config.flightsLiveMode}
+                    prefill={{
+                      origin: trip.originCity,
+                      destination: trip.destinations[0] ?? "",
+                      depart: trip.departureDate,
+                      return: trip.returnDate,
+                      adults: trip.numberOfTravellers,
+                      cabin: trip.cabinClass,
+                      autoSearch: true,
+                    } satisfies FlightsPrefill}
+                    contact={{ name: trip.fullName, email: trip.email, phone: trip.phone }}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
           </motion.div>
         )}
       </AnimatePresence>
@@ -348,8 +467,8 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
         <button onClick={() => router.push("/")} className="text-sm text-[var(--text-muted)] hover:text-[var(--text)]">
           ← Modify requirements
         </button>
-        <Button onClick={handleBook} loading={booking} disabled={!selected}>
-          {selected ? `Book ${selectedPlan?.label} →` : "Select an itinerary"}
+        <Button onClick={handleBook} loading={booking} disabled={!selected} variant="outline">
+          {selected ? "Confirm itinerary & hotel →" : "Select an itinerary"}
         </Button>
       </div>
 

@@ -24,7 +24,7 @@ export function expediaPackageLink(opts: {
   departureDate: string;
   returnDate?: string;
   adults: number;
-  cabinClass: "economy" | "business" | "first";
+  cabinClass: "economy" | "premium_economy" | "business" | "first";
 }): string {
   const cabin = CABIN[opts.cabinClass] ?? "coach";
   const leg1 = `from:${opts.origin},to:${opts.destination},departure:${mdY(opts.departureDate)}TANYT`;

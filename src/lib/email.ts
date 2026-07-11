@@ -255,7 +255,7 @@ function buildEmailHtml(booking: BookingDetails): string {
 
         <div style="background:#fdfaf5;border:1px solid #e8e4d9;border-radius:8px;padding:20px;margin-bottom:24px">
           <h2 style="color:#0a1628;font-size:16px;margin:0 0 16px;display:flex;align-items:center">
-            ✈️ ${esc(plan.label)} — Flight Details
+            ${esc(plan.label)} — Flight Details
           </h2>
           ${outbound ? `
           <div style="margin-bottom:12px">
@@ -274,7 +274,7 @@ function buildEmailHtml(booking: BookingDetails): string {
         </div>
 
         <div style="background:#fdfaf5;border:1px solid #e8e4d9;border-radius:8px;padding:20px;margin-bottom:24px">
-          <h2 style="color:#0a1628;font-size:16px;margin:0 0 16px">🏨 Hotel Accommodation</h2>
+          <h2 style="color:#0a1628;font-size:16px;margin:0 0 16px">Hotel Accommodation</h2>
           <p style="color:#0a1628;font-size:15px;font-weight:bold;margin:0">${esc(plan.hotel.name)}</p>
           <p style="color:#4a5568;margin:4px 0">${esc(plan.hotel.location)}</p>
           <p style="color:#718096;font-size:13px;margin:4px 0">${esc(plan.hotel.checkIn)} → ${esc(plan.hotel.checkOut)} · ${trip.numberOfNights} nights</p>

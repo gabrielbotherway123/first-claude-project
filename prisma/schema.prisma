@@ -22,9 +22,10 @@ model User {
   phone                     String?
   defaultAirports           String? // JSON array of airport objects
   preferredAirlines         String? // JSON array of { airline, rewardsNumber }
-  defaultCabinClass         String? // economy | business | first
+  defaultCabinClass         String? // economy | premium_economy | business | first
   defaultHotelStars         Int?
   defaultLocationPreference String? // city_centre | airport | flexible
+  defaultAmenities          String? // JSON array of preferred amenities
   standingRequirements      String?
 
   accounts     Account[]
@@ -96,9 +97,10 @@ model Trip {
   hotelBudget  Float?
   currency     String
 
-  // Travellers & class
+  // Travellers & class. numberOfTravellers is the adult count.
   numberOfTravellers Int
-  cabinClass         String // economy | business | first
+  numberOfChildren   Int    @default(0)
+  cabinClass         String // economy | premium_economy | business | first
 
   // Airline preference
   preferredAirline String? // selected airline for this trip

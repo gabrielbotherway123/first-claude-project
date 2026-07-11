@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendBookingConfirmation } from "@/lib/email";
 import { auth } from "@/auth";
+import type { TripFormData } from "@/lib/types";
 
 function generateReference(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -68,7 +69,9 @@ export async function POST(req: NextRequest) {
         totalBudget: booking.trip.totalBudget ?? undefined,
         currency: booking.trip.currency,
         numberOfTravellers: booking.trip.numberOfTravellers,
-        cabinClass: booking.trip.cabinClass as "economy" | "business" | "first",
+        numberOfChildren: booking.trip.numberOfChildren,
+        cabinClass: booking.trip.cabinClass as TripFormData["cabinClass"],
+        directOnly: false,
         hotelStarRating: booking.trip.hotelStarRating,
         locationPreference: booking.trip.locationPreference as "city_centre" | "airport" | "flexible",
         amenities: JSON.parse(booking.trip.amenities),

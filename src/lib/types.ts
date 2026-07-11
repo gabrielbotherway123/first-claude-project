@@ -1,3 +1,6 @@
+/** Cabin classes supported across search, estimate and booking. */
+export type CabinClass = "economy" | "premium_economy" | "business" | "first";
+
 export interface TripFormData {
   // Traveller
   fullName: string;
@@ -12,9 +15,12 @@ export interface TripFormData {
   // Budget — single optional total (0/undefined = no constraint)
   totalBudget?: number;
   currency: string;
-  // Travel class
+  // Travel party & class. numberOfTravellers is the ADULT count; children are
+  // counted (and priced) separately.
   numberOfTravellers: number;
-  cabinClass: "economy" | "business" | "first";
+  numberOfChildren: number;
+  cabinClass: CabinClass;
+  directOnly: boolean; // prefer non-stop flights even when pricier
   // Accommodation
   hotelStarRating: number;
   locationPreference: "city_centre" | "airport" | "flexible";
@@ -24,6 +30,7 @@ export interface TripFormData {
   airlineRewards?: string;
   // Context
   tripPurpose: string;
+  customPurpose?: string; // free text when tripPurpose === "Other"
   specialRequirements?: string;
   loyaltyNumbers?: string;
 }
@@ -41,9 +48,10 @@ export interface UserProfile {
   phone: string;
   defaultAirports: string[];
   preferredAirlines: PreferredAirline[];
-  defaultCabinClass: "" | "economy" | "business" | "first";
+  defaultCabinClass: "" | CabinClass;
   defaultHotelStars: number | null;
   defaultLocationPreference: "" | "city_centre" | "airport" | "flexible";
+  defaultAmenities: string[];
   standingRequirements: string;
 }
 

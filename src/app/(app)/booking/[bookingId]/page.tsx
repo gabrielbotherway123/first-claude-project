@@ -161,7 +161,7 @@ export default async function BookingPage({
             <p className="font-semibold text-lg">{hotel.name}</p>
             <p className="text-[var(--text-muted)] mt-1">{hotel.location}</p>
           </div>
-          <span className="text-[var(--accent)]">{"★".repeat(hotel.stars)}</span>
+          <span className="text-[var(--accent)] font-semibold">{hotel.stars}-star</span>
         </div>
         <div className="grid sm:grid-cols-3 gap-3 text-sm mb-4">
           <InfoBox label="Check-in" value={hotel.checkIn} />
@@ -220,12 +220,12 @@ function FlightCard({ flight, cur }: { flight: FlightDetail; cur: string }) {
           <span className="text-xs text-[var(--text-dim)]">{flight.duration}</span>
           <div className="w-full flex items-center gap-1">
             <div className="flex-1 border-t border-dashed border-[var(--border-strong)]" />
-            <span className="text-[var(--accent)] text-xs">✈</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
             <div className="flex-1 border-t border-dashed border-[var(--border-strong)]" />
           </div>
           {flight.layovers.length > 0 ? (
             <span className="text-xs text-[var(--accent)]">
-              {flight.layovers.length} stop · {flight.layovers.map((l) => stripCode(l.airport)).join(", ")}
+              Connects in {flight.layovers.map((l) => stripCode(l.airport)).join(", ")}
             </span>
           ) : (
             <span className="text-xs text-[var(--success)]">Direct</span>

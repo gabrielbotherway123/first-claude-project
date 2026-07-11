@@ -257,6 +257,7 @@ export interface DuffelSearchParams {
   departureDate: string; // YYYY-MM-DD
   returnDate?: string;
   adults: number;
+  children?: number;
   cabinClass: "economy" | "premium_economy" | "business" | "first";
   maxConnections?: number;
 }
@@ -269,12 +270,19 @@ export async function searchDuffelOffers(params: DuffelSearchParams): Promise<Du
     slices.push({ origin: params.destination, destination: params.origin, departure_date: params.returnDate });
   }
 
+  // Adults as { type: "adult" }; children carry an age (Duffel requires it for
+  // non-adult passengers). 8 is a reasonable mid-childhood default for pricing.
+  const passengers = [
+    ...Array.from({ length: params.adults }, () => ({ type: "adult" as const })),
+    ...Array.from({ length: params.children ?? 0 }, () => ({ age: 8 })),
+  ];
+
   const request = await duffelFetch<DuffelOfferRequest>("/air/offer_requests", {
     method: "POST",
     query: { return_offers: "false", supplier_timeout: "15000" },
     body: {
       slices,
-      passengers: Array.from({ length: params.adults }, () => ({ type: "adult" })),
+      passengers,
       cabin_class: params.cabinClass,
       max_connections: params.maxConnections ?? 1,
     },

@@ -10,7 +10,9 @@ const searchSchema = z.object({
   departureDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   adults: z.number().int().min(1).max(9),
-  cabinClass: z.enum(["economy", "business", "first"]),
+  children: z.number().int().min(0).max(8).optional(),
+  cabinClass: z.enum(["economy", "premium_economy", "business", "first"]),
+  directOnly: z.boolean().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -37,8 +39,10 @@ export async function POST(req: NextRequest) {
       departureDate: p.departureDate,
       returnDate: p.returnDate,
       adults: p.adults,
+      children: p.children ?? 0,
       cabinClass: p.cabinClass,
       currency: "USD",
+      directOnly: p.directOnly,
     });
     if (!result.ok) throw new Error(result.error || "Search failed");
     return NextResponse.json({ offers: result.data || [] });

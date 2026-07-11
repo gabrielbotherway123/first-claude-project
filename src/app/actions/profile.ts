@@ -13,6 +13,7 @@ export type ProfileInput = {
   defaultCabinClass: string;
   defaultHotelStars: number | null;
   defaultLocationPreference: string;
+  defaultAmenities: string[];
   standingRequirements: string;
 };
 
@@ -28,6 +29,7 @@ export async function saveProfileAction(
   const preferredAirlines = input.preferredAirlines
     .filter((a) => a.airline.trim())
     .map((a) => ({ airline: a.airline.trim(), rewardsNumber: a.rewardsNumber.trim() }));
+  const defaultAmenities = input.defaultAmenities.map((a) => a.trim()).filter(Boolean);
 
   await prisma.user.update({
     where: { id: session.user.id },
@@ -39,6 +41,7 @@ export async function saveProfileAction(
       defaultCabinClass: input.defaultCabinClass || null,
       defaultHotelStars: input.defaultHotelStars,
       defaultLocationPreference: input.defaultLocationPreference || null,
+      defaultAmenities: JSON.stringify(defaultAmenities),
       standingRequirements: input.standingRequirements.trim() || null,
     },
   });

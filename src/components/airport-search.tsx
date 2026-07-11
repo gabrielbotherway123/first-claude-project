@@ -112,7 +112,10 @@ export function AirportSearch({
           {loading ? (
             <span className="block w-4 h-4 rounded-full border-2 border-[var(--text-dim)] border-t-transparent animate-spin" />
           ) : (
-            "✈"
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <circle cx="11" cy="11" r="7" />
+              <path strokeLinecap="round" d="M21 21l-4.3-4.3" />
+            </svg>
           )}
         </span>
       </div>

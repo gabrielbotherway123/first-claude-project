@@ -14,7 +14,7 @@ function flightsLink(opts: {
   departureDate: string;
   returnDate?: string;
   adults: number;
-  cabinClass: "economy" | "business" | "first";
+  cabinClass: "economy" | "premium_economy" | "business" | "first";
 }): string {
   const qs = new URLSearchParams({
     origin: opts.origin,
@@ -54,7 +54,22 @@ const FX: Record<string, number> = {
   JPY: 150, AUD: 1.52, NZD: 1.66, CAD: 1.36,
 };
 
-const CABIN_MULT: Record<string, number> = { economy: 1, business: 3.2, first: 5 };
+const CABIN_MULT: Record<string, number> = {
+  economy: 1,
+  premium_economy: 1.6,
+  business: 3.2,
+  first: 5,
+};
+
+// Primary hub per major carrier — used to name the connecting airport on any
+// estimated one-stop itinerary so a non-direct flight always says where it stops.
+const CARRIER_HUB: Record<string, string> = {
+  EK: "DXB", EY: "AUH", QR: "DOH", SV: "RUH", TK: "IST", QF: "SYD", NZ: "AKL",
+  SQ: "SIN", CX: "HKG", CI: "TPE", NH: "HND", JL: "HND", KE: "ICN", TG: "BKK",
+  MH: "KUL", GA: "CGK", BA: "LHR", VS: "LHR", AF: "CDG", KL: "AMS", LH: "FRA",
+  LX: "ZRH", OS: "VIE", IB: "MAD", AZ: "FCO", SK: "CPH", AY: "HEL", EI: "DUB",
+  UA: "SFO", AA: "DFW", DL: "ATL", AC: "YYZ", ET: "ADD", SA: "JNB", QF2: "SYD",
+};
 
 interface Band {
   usd: number; // economy return per person
@@ -107,6 +122,7 @@ function leg(opts: {
   depHour: number;
   durH: number;
   stops: number;
+  hub: string; // connecting airport when stops > 0
   price: number;
   isReturn: boolean;
   bookingLink: string;
@@ -121,7 +137,7 @@ function leg(opts: {
       date: opts.date,
     },
     arrival: { airport: opts.destination, time: arr.time, date: arr.date },
-    layovers: Array.from({ length: opts.stops }, () => ({ airport: "—", duration: "1h 30m" })),
+    layovers: Array.from({ length: opts.stops }, () => ({ airport: opts.hub, duration: "1h 30m" })),
     duration: hours(opts.durH),
     price: Math.round(opts.price),
     isReturn: opts.isReturn,
@@ -135,11 +151,13 @@ export function estimateFlights(params: {
   departureDate: string;
   returnDate?: string;
   adults: number;
-  cabinClass: "economy" | "business" | "first";
+  children?: number;
+  cabinClass: "economy" | "premium_economy" | "business" | "first";
   currency: string;
   originCountry?: string;
   destinationCountry?: string;
   preferredAirline?: string;
+  directOnly?: boolean;
 }): FlightOffer[] {
   const b = band(params.originCountry, params.destinationCountry);
   const rate = fx(params.currency);
@@ -147,6 +165,7 @@ export function estimateFlights(params: {
   const roundTrip = Boolean(params.returnDate);
   const tripFactor = roundTrip ? 1 : 0.6;
   const basePerPerson = b.usd * cabin * tripFactor * rate;
+  const children = params.children ?? 0;
 
   // When a preferred airline is set, every estimated option flies that carrier.
   const forced = params.preferredAirline ? findAirline(params.preferredAirline) : undefined;
@@ -174,13 +193,21 @@ export function estimateFlights(params: {
   ];
 
   return variants.map((v) => {
-    const pricePerPerson = round5(basePerPerson * v.priceMult);
-    const total = pricePerPerson * params.adults;
-    const durH = b.hours * v.durMult;
+    const hub = CARRIER_HUB[v.carrier.code] ?? "";
+    // Prefer direct when requested. We also never invent a connection we can't
+    // name: with no known hub for the carrier, the leg is shown as non-stop and
+    // priced with a small direct premium.
+    const forcedDirect = params.directOnly || !hub;
+    const stops = forcedDirect ? 0 : v.stops;
+    const priceMult = v.priceMult * (forcedDirect && v.stops > 0 ? 1.18 : 1);
+    const pricePerAdult = round5(basePerPerson * priceMult);
+    // Children priced at ~75% of the adult fare.
+    const total = pricePerAdult * (params.adults + children * 0.75);
+    const durH = b.hours * v.durMult * (forcedDirect && v.stops > 0 ? 0.82 : 1);
     const flights: FlightDetail[] = [
       leg({
         airline: v.carrier, origin: params.origin, destination: params.destination,
-        date: params.departureDate, depHour: v.depHour, durH, stops: v.stops,
+        date: params.departureDate, depHour: v.depHour, durH, stops, hub,
         price: roundTrip ? total / 2 : total, isReturn: false, bookingLink: link,
       }),
     ];
@@ -188,7 +215,7 @@ export function estimateFlights(params: {
       flights.push(
         leg({
           airline: v.carrier, origin: params.destination, destination: params.origin,
-          date: params.returnDate, depHour: 18, durH, stops: v.stops,
+          date: params.returnDate, depHour: 18, durH, stops, hub,
           price: total / 2, isReturn: true, bookingLink: link,
         })
       );
@@ -232,7 +259,7 @@ export function estimateHotels(params: {
   return tiers.map((t) => {
     const nightly = round5(baseUsd * t.mult * rate);
     return {
-      name: `${params.stars}★ ${t.label} stay · ${params.city}`,
+      name: `${params.stars}-star ${t.label} stay · ${params.city}`,
       location: `${params.city} (central business district)`,
       address: "",
       stars: params.stars,

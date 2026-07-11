@@ -37,7 +37,7 @@ function addDays(iso: string, days: number): string {
 
 function placeholderHotel(trip: TripFormData, city: string, checkIn: string, checkOut: string): HotelDetail {
   return {
-    name: `${trip.hotelStarRating}★ hotels in ${city}`,
+    name: `${trip.hotelStarRating}-star hotels in ${city}`,
     location: city,
     address: "",
     stars: trip.hotelStarRating,
@@ -124,8 +124,10 @@ export async function buildItineraries(
         departureDate: trip.departureDate,
         returnDate: trip.returnDate || undefined,
         adults: trip.numberOfTravellers,
+        children: trip.numberOfChildren,
         cabinClass: trip.cabinClass,
         currency: trip.currency,
+        directOnly: trip.directOnly,
       })
     : null;
 
@@ -160,11 +162,13 @@ export async function buildItineraries(
         departureDate: trip.departureDate,
         returnDate: trip.returnDate || undefined,
         adults: trip.numberOfTravellers,
+        children: trip.numberOfChildren,
         cabinClass: trip.cabinClass,
         currency: trip.currency,
         originCountry,
         destinationCountry,
         preferredAirline: trip.preferredAirline || undefined,
+        directOnly: trip.directOnly,
       });
       flightSource = "Indicative estimate";
       flightsEstimated = true;
@@ -188,6 +192,16 @@ export async function buildItineraries(
     } else if (!flightsEstimated) {
       airlineNote = `No ${preferred} flights available for this route — showing next best option`;
     }
+  }
+
+  // ── Direct-flight preference: when the traveller opts for non-stop (the
+  // default), use only direct offers whenever any exist — even if pricier —
+  // so every one of the five plans is a non-stop itinerary. Falls back to
+  // connecting flights only when the route genuinely has no direct option.
+  const isDirectOffer = (o: FlightOffer) => o.flights.every((f) => f.layovers.length === 0);
+  if (trip.directOnly) {
+    const directOffers = offers.filter(isDirectOffer);
+    if (directOffers.length > 0) offers = directOffers;
   }
 
   // ── Hotels: Duffel Stays (live, bookable) → indicative estimate ──

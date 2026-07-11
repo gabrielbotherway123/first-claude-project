@@ -31,7 +31,7 @@ export async function scrapeFlights(params: {
   departureDate: string;
   returnDate?: string;
   adults: number;
-  cabinClass: "economy" | "business" | "first";
+  cabinClass: "economy" | "premium_economy" | "business" | "first";
   currency: string;
 }): Promise<ProviderResult<FlightOffer[]>> {
   const cacheKey = `scrape:flights:${JSON.stringify(params)}`;

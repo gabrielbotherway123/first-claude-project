@@ -38,6 +38,7 @@ export const getCurrentProfile = cache(async (): Promise<UserProfile> => {
     defaultHotelStars: user.defaultHotelStars,
     defaultLocationPreference:
       (user.defaultLocationPreference as UserProfile["defaultLocationPreference"]) ?? "",
+    defaultAmenities: parseJsonArray<string>(user.defaultAmenities),
     standingRequirements: user.standingRequirements ?? "",
   };
 });

@@ -1,5 +1,6 @@
 import "server-only";
 import type { FlightOffer } from "@/lib/providers/amadeus";
+import type { CabinClass } from "@/lib/types";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { ProviderResult, isConfigured } from "./types";
 import { searchDuffelOffers, duffelLiveMode, DuffelApiError } from "@/lib/duffel";
@@ -26,8 +27,10 @@ export async function duffelFlights(params: {
   departureDate: string;
   returnDate?: string;
   adults: number;
-  cabinClass: "economy" | "business" | "first";
+  children?: number;
+  cabinClass: CabinClass;
   currency: string;
+  directOnly?: boolean; // when true, only non-stop offers
 }): Promise<ProviderResult<FlightOffer[]>> {
   if (!isConfigured(process.env.DUFFEL_ACCESS_TOKEN)) {
     return { ok: false, error: "Duffel not configured (set DUFFEL_ACCESS_TOKEN)." };
@@ -44,7 +47,9 @@ export async function duffelFlights(params: {
       departureDate: params.departureDate,
       returnDate: params.returnDate,
       adults: params.adults,
+      children: params.children ?? 0,
       cabinClass: params.cabinClass,
+      maxConnections: params.directOnly ? 0 : 1,
     });
 
     const flightsLink = (() => {
@@ -55,6 +60,7 @@ export async function duffelFlights(params: {
         adults: String(params.adults),
         cabin: params.cabinClass,
       });
+      if (params.children) qs.set("children", String(params.children));
       if (params.returnDate) qs.set("return", params.returnDate);
       return `/flights?${qs.toString()}`;
     })();

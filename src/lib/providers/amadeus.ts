@@ -107,7 +107,7 @@ export async function searchFlights(params: {
   departureDate: string;
   returnDate?: string;
   adults: number;
-  cabinClass: "economy" | "business" | "first";
+  cabinClass: "economy" | "premium_economy" | "business" | "first";
   currency: string;
 }): Promise<ProviderResult<FlightOffer[]>> {
   const key = process.env.AMADEUS_API_KEY;

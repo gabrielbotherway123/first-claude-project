@@ -1,5 +1,4 @@
 import { getCurrentProfile } from "@/lib/user";
-import { duffelPlanSearchEnabled } from "@/lib/providers/duffel";
 import { FlightBooking, type FlightsPrefill } from "@/components/flight-booking";
 
 export const metadata = { title: "Book a flight · Atlas" };
@@ -30,7 +29,7 @@ export default async function FlightsPage({
 
   return (
     <FlightBooking
-      configured={duffelPlanSearchEnabled()}
+      configured={Boolean(process.env.DUFFEL_ACCESS_TOKEN)}
       liveMode={liveMode}
       prefill={prefill}
       contact={{ name: profile.name, email: profile.email, phone: profile.phone }}

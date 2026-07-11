@@ -185,7 +185,11 @@ export function Select({
                       <span className="block text-xs text-[var(--text-dim)]">{o.sublabel}</span>
                     )}
                   </span>
-                  {isSel && <span className="text-[var(--accent)] text-sm shrink-0">✓</span>}
+                  {isSel && (
+                    <svg className="w-4 h-4 text-[var(--accent)] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
                 </li>
               );
             })}

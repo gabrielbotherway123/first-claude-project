@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
       defaultHotelStars: user?.defaultHotelStars ?? null,
       defaultLocationPreference:
         (user?.defaultLocationPreference as UserProfile["defaultLocationPreference"]) ?? "",
+      defaultAmenities: parseArr<string>(user?.defaultAmenities ?? null),
       standingRequirements: user?.standingRequirements ?? "",
     };
 
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest) {
         totalBudget: body.totalBudget ?? null,
         currency: body.currency,
         numberOfTravellers: body.numberOfTravellers,
+        numberOfChildren: body.numberOfChildren ?? 0,
         cabinClass: body.cabinClass,
         preferredAirline: body.preferredAirline ?? null,
         airlineRewards: body.airlineRewards ?? null,
@@ -149,6 +151,7 @@ export async function GET(req: NextRequest) {
       totalBudget: trip.totalBudget,
       currency: trip.currency,
       numberOfTravellers: trip.numberOfTravellers,
+      numberOfChildren: trip.numberOfChildren,
       cabinClass: trip.cabinClass,
       preferredAirline: trip.preferredAirline,
       airlineNote: trip.airlineNote,
@@ -160,5 +163,9 @@ export async function GET(req: NextRequest) {
       loyaltyNumbers: trip.loyaltyNumbers,
     },
     plans,
+    config: {
+      flightsConfigured: Boolean(process.env.DUFFEL_ACCESS_TOKEN),
+      flightsLiveMode: (process.env.DUFFEL_ACCESS_TOKEN ?? "").startsWith("duffel_live_"),
+    },
   });
 }

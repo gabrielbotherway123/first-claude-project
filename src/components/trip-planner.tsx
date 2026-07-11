@@ -13,32 +13,22 @@ import type { TripFormData, UserProfile } from "@/lib/types";
 
 const DRAFT_KEY = "atlas:tripDraft";
 
-const CURRENCIES = ["GBP", "USD", "EUR", "CHF", "SGD", "AED", "JPY", "AUD", "NZD"];
+// NZD first — it's the default currency.
+const CURRENCIES = ["NZD", "AUD", "USD", "GBP", "EUR", "CHF", "SGD", "AED", "JPY", "CAD"];
 const AMENITIES = [
   "Gym", "Spa", "Pool", "Restaurant", "Bar", "Concierge",
   "Business Centre", "Room Service", "Parking", "Airport Shuttle",
   "Valet", "Laundry", "High-Speed WiFi",
 ];
-const PURPOSES = [
-  "Business Meeting", "Conference / Summit", "Client Entertainment",
-  "Board Offsite", "Roadshow", "Due Diligence Visit",
-  "Investor Relations", "Team Leadership", "Leisure", "Other",
-];
+// A short list so it never needs scrolling. "Other" reveals a free-text box.
+const PURPOSES = ["Business", "Conference", "Client Meeting", "Leisure", "Family", "Other"];
 
-function localeCurrency(): string {
-  try {
-    const lang = navigator.language || "en-GB";
-    const loc = new Intl.Locale(lang);
-    const region = (loc.maximize?.().region ?? loc.region ?? "").toUpperCase();
-    const map: Record<string, string> = {
-      US: "USD", GB: "GBP", CH: "CHF", SG: "SGD", AE: "AED", JP: "JPY",
-      AU: "AUD", NZ: "NZD", DE: "EUR", FR: "EUR", ES: "EUR", IT: "EUR", NL: "EUR", IE: "EUR",
-    };
-    return map[region] ?? "GBP";
-  } catch {
-    return "GBP";
-  }
-}
+const CABIN_OPTIONS = [
+  { value: "economy", label: "Economy" },
+  { value: "premium_economy", label: "Premium Economy" },
+  { value: "business", label: "Business" },
+  { value: "first", label: "First" },
+];
 
 function buildDefaults(profile: UserProfile): TripFormData {
   return {
@@ -51,15 +41,18 @@ function buildDefaults(profile: UserProfile): TripFormData {
     returnDate: "",
     numberOfNights: 0,
     totalBudget: undefined, // blank — optional
-    currency: "GBP",
-    numberOfTravellers: 1,
-    cabinClass: "economy", // Economy is the default
+    currency: "NZD", // default currency
+    numberOfTravellers: 1, // adults
+    numberOfChildren: 0,
+    cabinClass: (profile.defaultCabinClass || "economy") as TripFormData["cabinClass"],
+    directOnly: true, // prefer non-stop flights by default
     preferredAirline: "",
     airlineRewards: "",
     hotelStarRating: profile.defaultHotelStars ?? 5,
     locationPreference: (profile.defaultLocationPreference || "city_centre") as TripFormData["locationPreference"],
-    amenities: [],
+    amenities: profile.defaultAmenities ?? [], // seed from saved profile defaults
     tripPurpose: "",
+    customPurpose: "",
     specialRequirements: profile.standingRequirements,
     loyaltyNumbers: "",
   };
@@ -89,8 +82,6 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
         const saved = JSON.parse(raw);
         setForm((prev) => ({ ...prev, ...saved }));
         setDraftRestored(true);
-      } else {
-        setForm((prev) => ({ ...prev, currency: localeCurrency() }));
       }
     } catch {
       /* ignore */
@@ -122,7 +113,7 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
     } catch {
       /* ignore */
     }
-    setForm({ ...buildDefaults(profile), currency: localeCurrency() });
+    setForm(buildDefaults(profile));
     setDraftRestored(false);
     setStep(1);
   }
@@ -177,13 +168,22 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
     if (!form.departureDate || !form.returnDate)
       return setError("Please choose your travel dates.");
     if (!form.tripPurpose) return setError("Please select the purpose of your trip.");
+    if (form.tripPurpose === "Other" && !form.customPurpose?.trim())
+      return setError("Please describe the purpose of your trip.");
+
+    // When "Other" is chosen, the free-text description becomes the purpose.
+    const payload: TripFormData = {
+      ...form,
+      tripPurpose:
+        form.tripPurpose === "Other" ? form.customPurpose!.trim() : form.tripPurpose,
+    };
 
     setLoading(true);
     try {
       const request = fetch("/api/trips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       }).then(async (res) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Failed to generate itineraries");
@@ -195,7 +195,8 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
         request,
         new Promise((r) => setTimeout(r, 4500)),
       ]);
-      localStorage.removeItem(DRAFT_KEY);
+      // Keep the draft in localStorage so "Modify requirements" on the plans
+      // page returns here with every selection intact.
       router.push(`/plans/${data.tripId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -305,7 +306,7 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
                           : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]"
                       }`}
                     >
-                      ✈ {a}
+                      {a}
                     </button>
                   ))}
                 </div>
@@ -349,40 +350,66 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
             <GlassCard strong className="p-7 space-y-5">
               <SectionTitle>Dates & party</SectionTitle>
               <DateRangePicker from={form.departureDate} to={form.returnDate} onChange={setDates} />
-              <div className="grid sm:grid-cols-3 gap-4">
-                <FloatingInput
-                  label="Total budget"
-                  type="number"
-                  min={0}
-                  value={form.totalBudget ? form.totalBudget : ""}
-                  onChange={(e) => set("totalBudget", e.target.value ? parseFloat(e.target.value) : undefined)}
-                />
-                <Select
-                  label="Currency"
+
+              <FloatingInput
+                label="Total budget (optional)"
+                type="number"
+                min={0}
+                value={form.totalBudget ? form.totalBudget : ""}
+                onChange={(e) => set("totalBudget", e.target.value ? parseFloat(e.target.value) : undefined)}
+              />
+
+              <div>
+                <FieldLabel>Currency</FieldLabel>
+                <Pills
+                  options={CURRENCIES}
                   value={form.currency}
-                  onChange={(v) => set("currency", v)}
-                  options={CURRENCIES.map((c) => ({ value: c, label: c }))}
+                  onSelect={(c) => set("currency", c)}
                 />
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
                 <Select
-                  label="Travellers"
+                  label="Adults"
                   value={String(form.numberOfTravellers)}
                   onChange={(v) => set("numberOfTravellers", Number(v))}
-                  options={Array.from({ length: 12 }, (_, i) => ({
+                  options={Array.from({ length: 9 }, (_, i) => ({
                     value: String(i + 1),
-                    label: `${i + 1} ${i === 0 ? "traveller" : "travellers"}`,
+                    label: `${i + 1} ${i === 0 ? "adult" : "adults"}`,
+                  }))}
+                />
+                <Select
+                  label="Children"
+                  value={String(form.numberOfChildren)}
+                  onChange={(v) => set("numberOfChildren", Number(v))}
+                  options={Array.from({ length: 9 }, (_, i) => ({
+                    value: String(i),
+                    label: `${i} ${i === 1 ? "child" : "children"}`,
                   }))}
                 />
               </div>
+
               <Select
                 label="Cabin class"
                 value={form.cabinClass}
                 onChange={(v) => set("cabinClass", v as TripFormData["cabinClass"])}
-                options={[
-                  { value: "economy", label: "Economy" },
-                  { value: "business", label: "Business" },
-                  { value: "first", label: "First" },
-                ]}
+                options={CABIN_OPTIONS}
               />
+
+              <div>
+                <FieldLabel>Flight preference</FieldLabel>
+                <button
+                  type="button"
+                  onClick={() => set("directOnly", !form.directOnly)}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+                    form.directOnly
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]"
+                      : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]"
+                  }`}
+                >
+                  Prefer direct flights (even if pricier)
+                </button>
+              </div>
             </GlassCard>
 
             <div className="flex justify-end">
@@ -415,7 +442,7 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
                     onChange={(e) => set("airlineRewards", e.target.value)}
                   />
                   {savedAirlineMatch && (
-                    <p className="mt-1 text-xs text-[var(--accent)]">✓ Applied from your saved profile</p>
+                    <p className="mt-1 text-xs text-[var(--accent)]">Applied from your saved profile</p>
                   )}
                   {form.preferredAirline && !savedAirlineMatch && (
                     <p className="mt-1 text-xs text-[var(--text-dim)]">
@@ -471,16 +498,24 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
 
             <GlassCard strong className="p-7 space-y-5">
               <SectionTitle>Context</SectionTitle>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <Select
-                  label="Purpose of trip"
+              <div>
+                <FieldLabel>Purpose of trip</FieldLabel>
+                <Pills
+                  options={PURPOSES}
                   value={form.tripPurpose}
-                  onChange={(v) => set("tripPurpose", v)}
-                  placeholder="Select…"
-                  options={PURPOSES.map((p) => ({ value: p, label: p }))}
+                  onSelect={(p) => set("tripPurpose", p)}
                 />
-                <FloatingInput label="Other loyalty numbers" value={form.loyaltyNumbers ?? ""} onChange={(e) => set("loyaltyNumbers", e.target.value)} />
+                {form.tripPurpose === "Other" && (
+                  <div className="mt-3">
+                    <FloatingInput
+                      label="Describe the purpose of your trip"
+                      value={form.customPurpose ?? ""}
+                      onChange={(e) => set("customPurpose", e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
+              <FloatingInput label="Other loyalty numbers" value={form.loyaltyNumbers ?? ""} onChange={(e) => set("loyaltyNumbers", e.target.value)} />
               <FloatingTextarea
                 label="Special requirements"
                 rows={3}
@@ -540,10 +575,8 @@ function PlanningScreen() {
         <motion.div
           animate={{ scale: [1, 1.06, 1] }}
           transition={{ repeat: Infinity, duration: 2.4, ease: "easeInOut" }}
-          className="relative w-20 h-20 rounded-full accent-gradient flex items-center justify-center text-3xl text-[var(--accent-contrast)] shadow-xl"
-        >
-          ✈
-        </motion.div>
+          className="relative w-20 h-20 rounded-full accent-gradient shadow-xl"
+        />
       </div>
 
       <p className="text-xs tracking-[0.3em] uppercase text-[var(--text-dim)] mb-2">
@@ -612,4 +645,37 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <p className="text-sm text-[var(--text-muted)] mb-2">{children}</p>;
+}
+
+/** Wrapping pill selector — shows every option at once, no dropdown, no scroll. */
+function Pills({
+  options,
+  value,
+  onSelect,
+}: {
+  options: string[];
+  value: string;
+  onSelect: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((o) => {
+        const selected = value === o;
+        return (
+          <button
+            key={o}
+            type="button"
+            onClick={() => onSelect(o)}
+            className={`px-3 py-1.5 rounded-full text-sm border transition-all ${
+              selected
+                ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]"
+                : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]"
+            }`}
+          >
+            {o}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
