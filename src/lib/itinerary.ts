@@ -3,12 +3,13 @@ import type { TripFormData, UserProfile, TravelPlan, HotelDetail, FlightDetail }
 import { extractIata, cityFor, countryFor } from "@/lib/airports";
 import { findAirline } from "@/lib/airlines";
 import { searchFlights, type FlightOffer } from "@/lib/providers/amadeus";
-import { searchHotels, bookingSearchLink, type HotelOption } from "@/lib/providers/booking";
+import { duffelFlights, duffelPlanSearchEnabled } from "@/lib/providers/duffel";
+import { duffelHotels, duffelStaysConfigured } from "@/lib/providers/duffel-stays";
+import { bookingSearchLink, type HotelOption } from "@/lib/providers/booking";
 import { getTransferEstimate } from "@/lib/providers/uber";
-import { rapidFlights, rapidHotels } from "@/lib/providers/rapidapi";
+import { rapidFlights } from "@/lib/providers/rapidapi";
 import { estimateFlights, estimateHotels } from "@/lib/providers/estimate";
 import { scrapeFlights } from "@/lib/scrapers/flights";
-import { scrapeHotels } from "@/lib/scrapers/hotels";
 import { scrapeTransfer } from "@/lib/scrapers/transport";
 
 const PLAN_META = [
@@ -107,7 +108,7 @@ export async function buildItineraries(
   // Scraping is opt-in (ENABLE_SCRAPING=true): it's slow and usually blocked, so
   // by default we skip straight to the API/estimate path for an instant result.
   const scrapingEnabled = process.env.ENABLE_SCRAPING === "true";
-  const [flightScrape, hotelScrape, transferScrape] = scrapingEnabled
+  const [flightScrape, transferScrape] = scrapingEnabled
     ? await Promise.all([
         scrapeFlights({
           origin,
@@ -118,18 +119,9 @@ export async function buildItineraries(
           cabinClass: trip.cabinClass,
           currency: trip.currency,
         }).catch((e) => ({ ok: false as const, error: String(e) })),
-        scrapeHotels({
-          city: destCity,
-          checkIn,
-          checkOut,
-          adults: trip.numberOfTravellers,
-          stars: trip.hotelStarRating,
-          currency: trip.currency,
-          nights: trip.numberOfNights || 1,
-        }).catch((e) => ({ ok: false as const, error: String(e) })),
         scrapeTransfer({ from: `${destination} Airport`, to: destCity, currency: trip.currency }).catch(() => null),
       ])
-    : [{ ok: false as const, error: "Scraping disabled" }, { ok: false as const, error: "Scraping disabled" }, null];
+    : [{ ok: false as const, error: "Scraping disabled" }, null];
 
   // Kick off the RapidAPI flight + hotel lookups concurrently (when not scraping)
   // so the whole build is ~max(flights, hotels), not the sum.
@@ -144,24 +136,29 @@ export async function buildItineraries(
         cabinClass: trip.cabinClass,
         currency: trip.currency,
       });
-  const rapidHotelsP = scrapingEnabled
-    ? null
-    : rapidHotels({
-        city: destCity,
-        checkIn,
-        checkOut,
+  // ── Flights: scraped → Duffel (bookable, live mode) → RapidAPI → Amadeus → estimate ──
+  const scrapeWon = flightScrape.ok && flightScrape.data.length > 0;
+  const duffelP = duffelPlanSearchEnabled() && !scrapeWon
+    ? duffelFlights({
+        origin,
+        destination,
+        departureDate: trip.departureDate,
+        returnDate: trip.returnDate || undefined,
         adults: trip.numberOfTravellers,
-        stars: trip.hotelStarRating,
+        cabinClass: trip.cabinClass,
         currency: trip.currency,
-        nights: trip.numberOfNights || 1,
-      });
+      })
+    : null;
 
-  // ── Flights: scraped → RapidAPI → Amadeus → estimate ──
   let offers: FlightOffer[];
   let flightSource: string;
+  const duffel = duffelP ? await duffelP : null;
   if (flightScrape.ok && flightScrape.data.length > 0) {
     offers = flightScrape.data;
     flightSource = "Google Flights (scraped)";
+  } else if (duffel?.ok && duffel.data.length > 0) {
+    offers = duffel.data;
+    flightSource = "Duffel (bookable in Atlas)";
   } else {
     const rapid = rapidFlightsP
       ? await rapidFlightsP
@@ -229,57 +226,40 @@ export async function buildItineraries(
     }
   }
 
-  // ── Hotels: scraped → Booking API fallback → affiliate placeholder ──
+  // ── Hotels: Duffel Stays (live, bookable) → indicative estimate ──
   let liveHotels: HotelOption[] = [];
-  let hotelSource: string;
+  let hotelSource = "Indicative estimate";
   let hotelOk = true;
-  if (hotelScrape.ok && hotelScrape.data.length > 0) {
-    liveHotels = hotelScrape.data;
-    hotelSource = "Booking.com (scraped)";
-  } else {
-    const rapid = rapidHotelsP
-      ? await rapidHotelsP
-      : await rapidHotels({
-          city: destCity,
-          checkIn,
-          checkOut,
-          adults: trip.numberOfTravellers,
-          stars: trip.hotelStarRating,
-          currency: trip.currency,
-          nights: trip.numberOfNights || 1,
-        });
-    const api = rapid.ok && rapid.data.length > 0
-      ? rapid
-      : await searchHotels({
-          city: destCity,
-          checkIn,
-          checkOut,
-          adults: trip.numberOfTravellers,
-          stars: trip.hotelStarRating,
-          currency: trip.currency,
-          nights: trip.numberOfNights || 1,
-        });
-    if (rapid.ok && rapid.data.length > 0) {
-      liveHotels = rapid.data;
-      hotelSource = "Booking.com";
-    } else if (api.ok && api.data.length > 0) {
-      liveHotels = api.data;
-      hotelSource = "Booking.com (API)";
-    } else {
-      // Indicative hotels (real affiliate link to confirm & book a real one).
-      liveHotels = estimateHotels({
-        city: destCity,
-        checkIn,
-        checkOut,
-        adults: trip.numberOfTravellers,
-        stars: trip.hotelStarRating,
-        currency: trip.currency,
-        nights: trip.numberOfNights || 1,
-      });
-      hotelOk = false;
-      hotelsEstimated = true;
-      hotelSource = "Indicative estimate";
+  if (duffelStaysConfigured()) {
+    const duffel = await duffelHotels({
+      city: destCity,
+      checkIn,
+      checkOut,
+      adults: trip.numberOfTravellers,
+      stars: trip.hotelStarRating,
+      currency: trip.currency,
+      nights: trip.numberOfNights || 1,
+    });
+    if (duffel.ok && duffel.data.length > 0) {
+      liveHotels = duffel.data;
+      hotelSource = "Duffel Stays (bookable in Atlas)";
+      hotelOk = true;
     }
+  }
+  if (liveHotels.length === 0) {
+    // Fallback to indicative estimate (real affiliate link to confirm & book a real one).
+    liveHotels = estimateHotels({
+      city: destCity,
+      checkIn,
+      checkOut,
+      adults: trip.numberOfTravellers,
+      stars: trip.hotelStarRating,
+      currency: trip.currency,
+      nights: trip.numberOfNights || 1,
+    });
+    hotelOk = false;
+    hotelsEstimated = true;
+    hotelSource = "Indicative estimate";
   }
 
   // ── Transfer: scraped → heuristic ──

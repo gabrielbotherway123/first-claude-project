@@ -27,9 +27,11 @@ model User {
   defaultLocationPreference String? // city_centre | airport | flexible
   standingRequirements      String?
 
-  accounts Account[]
-  sessions Session[]
-  trips    Trip[]
+  accounts     Account[]
+  sessions     Session[]
+  trips        Trip[]
+  flightOrders FlightOrder[]
+  hotelOrders  HotelOrder[]
 }
 
 model Account {
@@ -153,6 +155,65 @@ model Booking {
   status    String    @default("confirmed")
   reference String    @unique
   invoices  Invoice[]
+}
+
+// A real airline order placed through Duffel from the standalone
+// Flights flow — independent of the Trip/Plan/Booking pipeline.
+model FlightOrder {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  duffelOrderId    String  @unique
+  bookingReference String // airline PNR from Duffel
+  status           String  @default("confirmed")
+  liveMode         Boolean @default(false) // false = test-mode order, no real ticket
+
+  totalAmount Float
+  currency    String
+
+  originCity      String
+  destinationCity String
+  departureDate   String
+  returnDate      String?
+  cabinClass      String
+
+  airlineName String
+  airlineCode String
+  passengers  String // JSON [{ title, givenName, familyName }]
+  flights     String // JSON FlightDetail[]
+
+  @@index([userId])
+}
+
+// A real accommodation booking placed through Duffel Stays.
+model HotelOrder {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  duffelBookingId  String  @unique
+  bookingReference String // accommodation's own confirmation reference
+  status           String  @default("confirmed")
+  liveMode         Boolean @default(false) // false = test-mode booking, no real reservation
+
+  totalAmount Float
+  currency    String
+
+  accommodationName String
+  city              String
+  address           String?
+  checkInDate       String
+  checkOutDate      String
+  roomName          String?
+
+  guests String // JSON [{ givenName, familyName }]
+
+  @@index([userId])
 }
 
 model Invoice {

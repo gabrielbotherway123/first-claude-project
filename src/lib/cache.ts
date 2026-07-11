@@ -28,3 +28,15 @@ export async function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>
   cacheSet(key, value, ttlMs);
   return value;
 }
+
+/**
+ * Fixed-window rate limit on top of the same process-local store. Returns
+ * false once `max` calls have been made for `key` within `windowMs`.
+ */
+export function rateLimit(key: string, max: number, windowMs: number): boolean {
+  const bucketKey = `ratelimit:${key}:${Math.floor(Date.now() / windowMs)}`;
+  const count = cacheGet<number>(bucketKey) ?? 0;
+  if (count >= max) return false;
+  cacheSet(bucketKey, count + 1, windowMs);
+  return true;
+}
