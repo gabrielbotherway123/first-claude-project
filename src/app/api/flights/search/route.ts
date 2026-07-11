@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
-import { duffelPlanSearchEnabled, searchDuffelOffers } from "@/lib/providers/duffel";
+import { duffelPlanSearchEnabled, duffelFlights } from "@/lib/providers/duffel";
 import { rateLimit } from "@/lib/cache";
 
 const searchSchema = z.object({
@@ -10,7 +10,7 @@ const searchSchema = z.object({
   departureDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   adults: z.number().int().min(1).max(9),
-  cabinClass: z.enum(["economy", "premium_economy", "business", "first"]),
+  cabinClass: z.enum(["economy", "business", "first"]),
 });
 
 export async function POST(req: NextRequest) {
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await searchDuffelOffers({
+    const result = await duffelFlights({
       origin: p.origin.toUpperCase(),
       destination: p.destination.toUpperCase(),
       departureDate: p.departureDate,
