@@ -22,18 +22,6 @@ interface TripData {
   airlineNote?: string | null;
 }
 
-/** Single Booking.com link with destination, dates and guests pre-filled. */
-function bookingComboLink(trip: TripData): string {
-  const dest = stripCode(trip.destinations[0] ?? "");
-  const qs = new URLSearchParams({
-    ss: dest,
-    checkin: trip.departureDate,
-    checkout: trip.returnDate,
-    group_adults: String(trip.numberOfTravellers),
-  });
-  return `https://www.booking.com/searchresults.html?${qs.toString()}`;
-}
-
 interface PlanWithId extends TravelPlan {
   id: string;
 }
@@ -346,17 +334,6 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
               </div>
             </div>
 
-            {/* Single combined Booking.com hand-off */}
-            {trip && (
-              <a
-                href={bookingComboLink(trip)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-5 w-full inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-semibold accent-gradient text-[var(--accent-contrast)] shadow-lg hover:brightness-110 transition-all"
-              >
-                View & Book on Booking.com →
-              </a>
-            )}
           </motion.div>
         )}
       </AnimatePresence>

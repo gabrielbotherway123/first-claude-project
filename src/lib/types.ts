@@ -76,6 +76,20 @@ export interface HotelDetail {
   rating?: number; // guest review score (0-10) when available
 }
 
+/** A hotel result from a search provider (Duffel Stays or the indicative estimate). */
+export interface HotelOption {
+  name: string;
+  location: string;
+  address: string;
+  stars: number;
+  nightlyRate: number;
+  totalCost: number;
+  amenities: string[];
+  rating?: number; // guest score 0-10
+  cancellationPolicy: string;
+  bookingLink: string;
+}
+
 export interface TransferEstimate {
   provider: string; // e.g. "Uber" or "Estimate"
   product: string; // e.g. "UberX"

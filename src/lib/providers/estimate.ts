@@ -1,8 +1,32 @@
 import "server-only";
-import type { FlightDetail } from "@/lib/types";
+import type { FlightDetail, HotelOption } from "@/lib/types";
 import { AIRLINES, nationalCarrier, findAirline, type Airline } from "@/lib/airlines";
-import { bookingSearchLink, bookingFlightLink, type HotelOption } from "@/lib/providers/booking";
 import type { FlightOffer } from "@/lib/providers/amadeus";
+
+/**
+ * Internal deep-link into Atlas's own Duffel flight search, pre-filled and set to
+ * auto-search. Even when the displayed price is an indicative estimate, clicking
+ * through runs a live Duffel search and books inside Atlas — never a third party.
+ */
+function flightsLink(opts: {
+  origin: string;
+  destination: string;
+  departureDate: string;
+  returnDate?: string;
+  adults: number;
+  cabinClass: "economy" | "business" | "first";
+}): string {
+  const qs = new URLSearchParams({
+    origin: opts.origin,
+    destination: opts.destination,
+    depart: opts.departureDate,
+    adults: String(opts.adults),
+    cabin: opts.cabinClass,
+    autoSearch: "true",
+  });
+  if (opts.returnDate) qs.set("return", opts.returnDate);
+  return `/flights?${qs.toString()}`;
+}
 
 // ─── No-key indicative engine ───────────────────────────────────────────────
 // Produces plausible itineraries from real airlines/airports plus a fare model,
@@ -131,7 +155,7 @@ export function estimateFlights(params: {
   const premium =
     forced ?? AIRLINES.find((a) => ["EK", "QR", "SQ", "CX"].includes(a.code)) ?? primary;
 
-  const link = bookingFlightLink({
+  const link = flightsLink({
     origin: params.origin,
     destination: params.destination,
     departureDate: params.departureDate,
@@ -194,13 +218,9 @@ export function estimateHotels(params: {
   const rate = fx(params.currency);
   const baseUsd = params.stars >= 5 ? 280 : params.stars >= 4 ? 170 : 110;
   const nights = params.nights || 1;
-  const link = bookingSearchLink({
-    city: params.city,
-    checkIn: params.checkIn,
-    checkOut: params.checkOut,
-    adults: params.adults,
-    stars: params.stars,
-  });
+  // Estimate hotels are indicative only — there's no live Duffel accommodation to
+  // book, so no link. Live, bookable stays come from the Duffel Stays provider.
+  const link = "";
 
   // Business-quality tiers — all well-reviewed (8.0+) and central.
   const tiers = [

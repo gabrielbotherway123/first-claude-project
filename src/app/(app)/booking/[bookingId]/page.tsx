@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui";
-import { bookingSearchLink } from "@/lib/providers/booking";
 import type { FlightDetail, HotelDetail, TransferEstimate } from "@/lib/types";
 
 export const metadata = { title: "Complete your booking · Atlas" };
@@ -47,17 +46,11 @@ export default async function BookingPage({
   const outbound = flights.find((f) => !f.isReturn);
   const returnFlight = flights.find((f) => f.isReturn);
 
-  // Deep checkout links carried on the plan: the exact flight (via Booking's
-  // offer token) and the exact hotel/room — pre-loaded, details-and-pay.
-  // Fall back to a pre-filled search when a deep link isn't available.
-  const fallbackLink = bookingSearchLink({
-    city: stripCode(destinations[0] ?? ""),
-    checkIn: booking.trip.departureDate,
-    checkOut: booking.trip.returnDate,
-    adults: booking.trip.numberOfTravellers,
-  });
-  const hotelCheckout = hotel.bookingLink || fallbackLink;
-  const flightCheckout = outbound?.bookingLink || fallbackLink;
+  // Internal Atlas checkout links: the flight search (Duffel, pre-filled and
+  // auto-searching) and the exact hotel/room (Duffel Stays). Both book inside
+  // Atlas. The hotel link is empty for indicative-only estimates.
+  const hotelCheckout = hotel.bookingLink || "";
+  const flightCheckout = outbound?.bookingLink || "/flights";
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 fade-in-up">
@@ -68,8 +61,8 @@ export default async function BookingPage({
           {stripCode(booking.trip.originCity)} → {destinations.map(stripCode).join(" → ")}
         </h1>
         <p className="text-[var(--text-muted)] max-w-md mx-auto">
-          Your flights and room are pre-loaded in Booking.com's checkout — just enter your
-          details to complete each purchase.
+          Book your flights and room directly in Atlas — powered by Duffel. Just enter your
+          traveller details to complete each purchase.
         </p>
         <p className="text-xs text-[var(--text-dim)] mt-4">
           Atlas reference <span className="font-mono">{booking.reference}</span>
@@ -82,33 +75,36 @@ export default async function BookingPage({
           Complete your booking
         </h2>
         <div className="grid sm:grid-cols-2 gap-3">
-          <a
+          <Link
             href={flightCheckout}
-            target="_blank"
-            rel="noopener noreferrer"
             className="inline-flex flex-col items-center justify-center gap-1 rounded-xl px-6 py-4 accent-gradient text-[var(--accent-contrast)] shadow-lg hover:brightness-110 transition-all"
           >
-            <span className="text-base font-semibold">Buy flights →</span>
+            <span className="text-base font-semibold">Book flights →</span>
             <span className="text-xs opacity-80">
               {outbound?.airline} · {cur} {booking.plan.flightCost.toLocaleString()}
             </span>
-          </a>
-          <a
-            href={hotelCheckout}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex flex-col items-center justify-center gap-1 rounded-xl px-6 py-4 accent-gradient text-[var(--accent-contrast)] shadow-lg hover:brightness-110 transition-all"
-          >
-            <span className="text-base font-semibold">Buy hotel →</span>
-            <span className="text-xs opacity-80">
-              {hotel.name.length > 28 ? `${hotel.name.slice(0, 28)}…` : hotel.name} · {cur}{" "}
-              {booking.plan.hotelCost.toLocaleString()}
-            </span>
-          </a>
+          </Link>
+          {hotelCheckout ? (
+            <Link
+              href={hotelCheckout}
+              className="inline-flex flex-col items-center justify-center gap-1 rounded-xl px-6 py-4 accent-gradient text-[var(--accent-contrast)] shadow-lg hover:brightness-110 transition-all"
+            >
+              <span className="text-base font-semibold">Book hotel →</span>
+              <span className="text-xs opacity-80">
+                {hotel.name.length > 28 ? `${hotel.name.slice(0, 28)}…` : hotel.name} · {cur}{" "}
+                {booking.plan.hotelCost.toLocaleString()}
+              </span>
+            </Link>
+          ) : (
+            <div className="inline-flex flex-col items-center justify-center gap-1 rounded-xl px-6 py-4 glass text-[var(--text-muted)]">
+              <span className="text-base font-semibold">Hotel · indicative</span>
+              <span className="text-xs opacity-80">Live stays available for supported cities</span>
+            </div>
+          )}
         </div>
         <p className="text-xs text-[var(--text-dim)] mt-3">
-          Each opens Booking.com's checkout with your selection, dates and guests pre-loaded —
-          enter your details to pay. Prices are live estimates and may change at checkout.
+          Flights and stays are booked directly in Atlas through Duffel — no third-party
+          redirects. Prices are confirmed live before you pay.
         </p>
       </div>
 

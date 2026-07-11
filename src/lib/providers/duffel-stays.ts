@@ -1,5 +1,5 @@
 import "server-only";
-import type { HotelOption } from "@/lib/providers/booking";
+import type { HotelOption } from "@/lib/types";
 import { coordsForCity } from "@/lib/airports";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { ProviderResult, isConfigured } from "./types";

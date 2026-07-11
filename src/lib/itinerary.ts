@@ -1,13 +1,11 @@
 import "server-only";
-import type { TripFormData, UserProfile, TravelPlan, HotelDetail, FlightDetail } from "@/lib/types";
+import type { TripFormData, UserProfile, TravelPlan, HotelDetail, FlightDetail, HotelOption } from "@/lib/types";
 import { extractIata, cityFor, countryFor } from "@/lib/airports";
 import { findAirline } from "@/lib/airlines";
 import { searchFlights, type FlightOffer } from "@/lib/providers/amadeus";
 import { duffelFlights, duffelPlanSearchEnabled } from "@/lib/providers/duffel";
 import { duffelHotels, duffelStaysConfigured } from "@/lib/providers/duffel-stays";
-import { bookingSearchLink, type HotelOption } from "@/lib/providers/booking";
 import { getTransferEstimate } from "@/lib/providers/uber";
-import { rapidFlights } from "@/lib/providers/rapidapi";
 import { estimateFlights, estimateHotels } from "@/lib/providers/estimate";
 import { scrapeFlights } from "@/lib/scrapers/flights";
 import { scrapeTransfer } from "@/lib/scrapers/transport";
@@ -39,23 +37,17 @@ function addDays(iso: string, days: number): string {
 
 function placeholderHotel(trip: TripFormData, city: string, checkIn: string, checkOut: string): HotelDetail {
   return {
-    name: `Browse ${trip.hotelStarRating}★ hotels in ${city}`,
+    name: `${trip.hotelStarRating}★ hotels in ${city}`,
     location: city,
     address: "",
     stars: trip.hotelStarRating,
     nightlyRate: 0,
     totalCost: 0,
     amenities: trip.amenities,
-    cancellationPolicy: "Live availability unavailable — open Booking.com to see options",
+    cancellationPolicy: "Indicative only — live bookable stays shown when available",
     checkIn,
     checkOut,
-    bookingLink: bookingSearchLink({
-      city,
-      checkIn,
-      checkOut,
-      adults: trip.numberOfTravellers,
-      stars: trip.hotelStarRating,
-    }),
+    bookingLink: "",
   };
 }
 
@@ -123,20 +115,7 @@ export async function buildItineraries(
       ])
     : [{ ok: false as const, error: "Scraping disabled" }, null];
 
-  // Kick off the RapidAPI flight + hotel lookups concurrently (when not scraping)
-  // so the whole build is ~max(flights, hotels), not the sum.
-  const rapidFlightsP = scrapingEnabled
-    ? null
-    : rapidFlights({
-        origin,
-        destination,
-        departureDate: trip.departureDate,
-        returnDate: trip.returnDate || undefined,
-        adults: trip.numberOfTravellers,
-        cabinClass: trip.cabinClass,
-        currency: trip.currency,
-      });
-  // ── Flights: scraped → Duffel (bookable, live mode) → RapidAPI → Amadeus → estimate ──
+  // ── Flights: scraped → Duffel (bookable in Atlas) → Amadeus → estimate ──
   const scrapeWon = flightScrape.ok && flightScrape.data.length > 0;
   const duffelP = duffelPlanSearchEnabled() && !scrapeWon
     ? duffelFlights({
@@ -160,36 +139,21 @@ export async function buildItineraries(
     offers = duffel.data;
     flightSource = "Duffel (bookable in Atlas)";
   } else {
-    const rapid = rapidFlightsP
-      ? await rapidFlightsP
-      : await rapidFlights({
-          origin,
-          destination,
-          departureDate: trip.departureDate,
-          returnDate: trip.returnDate || undefined,
-          adults: trip.numberOfTravellers,
-          cabinClass: trip.cabinClass,
-          currency: trip.currency,
-        });
-    const api = rapid.ok && rapid.data.length > 0
-      ? rapid
-      : await searchFlights({
-          origin,
-          destination,
-          departureDate: trip.departureDate,
-          returnDate: trip.returnDate || undefined,
-          adults: trip.numberOfTravellers,
-          cabinClass: trip.cabinClass,
-          currency: trip.currency,
-        });
-    if (rapid.ok && rapid.data.length > 0) {
-      offers = rapid.data;
-      flightSource = "Booking.com flights";
-    } else if (api.ok && api.data.length > 0) {
+    const api = await searchFlights({
+      origin,
+      destination,
+      departureDate: trip.departureDate,
+      returnDate: trip.returnDate || undefined,
+      adults: trip.numberOfTravellers,
+      cabinClass: trip.cabinClass,
+      currency: trip.currency,
+    });
+    if (api.ok && api.data.length > 0) {
       offers = api.data;
       flightSource = "Amadeus";
     } else {
-      // No key + scrape blocked → indicative estimate so the app still works.
+      // No live source available → indicative estimate so the app still works.
+      // Every estimated fare links into Atlas's own Duffel flight search to book.
       offers = estimateFlights({
         origin,
         destination,
@@ -338,11 +302,11 @@ export async function buildItineraries(
 
   const unavailableShared: string[] = [];
   if (flightsEstimated)
-    unavailableShared.push("Flight prices are indicative estimates — confirm the live fare via the booking link.");
+    unavailableShared.push("Flight prices are indicative estimates — confirm the live fare when you book in Atlas.");
   if (hotelsEstimated)
-    unavailableShared.push("Hotel prices are indicative — open the Booking.com link to pick and confirm a real hotel.");
+    unavailableShared.push("Hotel prices are indicative — live, bookable stays are shown for supported destinations.");
   if (!hotelOk && !hotelsEstimated)
-    unavailableShared.push("Live hotel prices unavailable — showing Booking.com search links.");
+    unavailableShared.push("Live hotel prices unavailable for this destination right now.");
   if (!transfer.live)
     unavailableShared.push("Transfer fare is an approximate estimate.");
 
