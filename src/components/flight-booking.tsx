@@ -7,13 +7,16 @@ import { Button, FloatingInput } from "@/components/ui";
 import { Select } from "@/components/select";
 import { AirportSearch } from "@/components/airport-search";
 import { extractIata } from "@/lib/airports";
+import { convertCurrency } from "@/lib/currency";
 import type { FlightDetail } from "@/lib/types";
 
 interface OfferView {
   offerId: string;
   expiresAt: string;
-  totalAmount: number;
-  totalCurrency: string;
+  totalAmount: number; // Duffel's real amount — used for the booking price check
+  totalCurrency: string; // Duffel's real currency
+  displayAmount: number; // converted to the traveller's selected currency (display)
+  displayCurrency: string;
   airlineName: string;
   airlineCode: string;
   airlineLogo?: string;
@@ -42,6 +45,7 @@ export interface FlightsPrefill {
   return: string;
   adults: number;
   cabin: string;
+  currency: string;
   autoSearch: boolean;
 }
 
@@ -86,11 +90,13 @@ export function FlightBooking({
   configured,
   liveMode,
   prefill,
+  hotel,
   contact,
 }: {
   configured: boolean;
   liveMode: boolean;
   prefill: FlightsPrefill;
+  hotel?: { city: string; checkIn: string; checkOut: string; adults: number } | null;
   contact: { name: string; email: string; phone: string };
 }) {
   const router = useRouter();
@@ -145,6 +151,7 @@ export function FlightBooking({
           returnDate: tripType === "return" ? returnDate : undefined,
           adults: parseInt(adults, 10),
           cabinClass: cabin,
+          currency: prefill.currency || undefined,
         }),
       });
       const data = await res.json();
@@ -248,12 +255,48 @@ export function FlightBooking({
       });
       const data = await res.json();
       if (res.ok) {
+        // Combined "Book now": the same press books the hotel too, using the lead
+        // traveller as the guest. Flight is already booked, so we never block on
+        // the hotel — we pass its outcome to the confirmation page.
+        if (hotel) {
+          setNotice("Flight booked — securing your hotel…");
+          let hotelParam = "hotel=failed";
+          try {
+            const lead = passengers[0];
+            const hres = await fetch("/api/hotels/auto-book", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                city: hotel.city,
+                checkIn: hotel.checkIn,
+                checkOut: hotel.checkOut,
+                adults: hotel.adults,
+                email: lead.email.trim(),
+                phoneNumber: lead.phoneNumber.replace(/[\s()-]/g, ""),
+                guests: passengers.map((p) => ({ givenName: p.givenName.trim(), familyName: p.familyName.trim() })),
+              }),
+            });
+            const hdata = await hres.json().catch(() => ({}));
+            hotelParam = hres.ok
+              ? `hotel=${hdata.orderId}`
+              : hdata.code === "stays_not_enabled"
+                ? "hotel=stays_disabled"
+                : "hotel=failed";
+          } catch {
+            hotelParam = "hotel=failed";
+          }
+          router.push(`/flights/orders/${data.orderId}?${hotelParam}`);
+          return;
+        }
         router.push(`/flights/orders/${data.orderId}`);
         return;
       }
       if (data.code === "price_changed" && typeof data.newTotal === "number") {
-        setSelected({ ...selected, totalAmount: data.newTotal, totalCurrency: data.newCurrency ?? selected.totalCurrency });
-        setNotice(`The fare changed to ${money(data.newTotal, data.newCurrency ?? selected.totalCurrency)}. Review and press Book again to confirm.`);
+        const newCur = data.newCurrency ?? selected.totalCurrency;
+        const dispCur = prefill.currency || newCur;
+        const dispAmt = convertCurrency(data.newTotal, newCur, dispCur);
+        setSelected({ ...selected, totalAmount: data.newTotal, totalCurrency: newCur, displayAmount: dispAmt, displayCurrency: dispCur });
+        setNotice(`The fare changed to ${money(dispAmt, dispCur)}. Review and press Book again to confirm.`);
       } else if (data.code === "offer_expired" || data.code === "offer_mismatch") {
         setError("This fare has expired — run the search again for fresh prices.");
       } else {
@@ -390,7 +433,7 @@ export function FlightBooking({
                       {offer.refundable && <span className="text-xs text-[var(--success)]">Refundable</span>}
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold">{money(offer.totalAmount, offer.totalCurrency)}</p>
+                      <p className="text-lg font-bold">{money(offer.displayAmount, offer.displayCurrency)}</p>
                       <p className="text-xs text-[var(--text-dim)]">total · {offer.passengerIds.length} pax</p>
                     </div>
                   </div>
@@ -446,7 +489,7 @@ export function FlightBooking({
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-xs text-[var(--text-dim)] uppercase">Total</p>
-                  <p className="text-2xl font-bold">{money(selected.totalAmount, selected.totalCurrency)}</p>
+                  <p className="text-2xl font-bold">{money(selected.displayAmount, selected.displayCurrency)}</p>
                 </div>
               </div>
               <div className="space-y-2">
@@ -493,7 +536,7 @@ export function FlightBooking({
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <p className="text-xs text-[var(--text-dim)] uppercase mb-1">Pay now</p>
-                  <p className="text-2xl font-bold text-[var(--accent)]">{money(selected.totalAmount, selected.totalCurrency)}</p>
+                  <p className="text-2xl font-bold text-[var(--accent)]">{money(selected.displayAmount, selected.displayCurrency)}</p>
                   {!selected.liveMode && (
                     <p className="text-xs text-[var(--text-dim)] mt-1">Test booking — no money moves, no ticket is issued.</p>
                   )}

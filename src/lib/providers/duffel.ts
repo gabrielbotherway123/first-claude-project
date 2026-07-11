@@ -17,8 +17,10 @@ import { searchDuffelOffers, duffelLiveMode, DuffelApiError } from "@/lib/duffel
  * fakes with unrealistic prices, which would pollute plan quality.
  */
 export function duffelPlanSearchEnabled(): boolean {
-  if (!isConfigured(process.env.DUFFEL_ACCESS_TOKEN)) return false;
-  return duffelLiveMode() || process.env.DUFFEL_IN_PLANS === "true";
+  // Use Duffel for the plan's flights whenever it's configured, so the flights
+  // shown on the itinerary are the exact live fares the traveller will book —
+  // no mismatch between the choosing screen and the booking screen.
+  return isConfigured(process.env.DUFFEL_ACCESS_TOKEN);
 }
 
 export async function duffelFlights(params: {
@@ -50,6 +52,7 @@ export async function duffelFlights(params: {
       children: params.children ?? 0,
       cabinClass: params.cabinClass,
       maxConnections: params.directOnly ? 0 : 1,
+      displayCurrency: params.currency,
     });
 
     const flightsLink = (() => {
@@ -65,23 +68,22 @@ export async function duffelFlights(params: {
       return `/flights?${qs.toString()}`;
     })();
 
-    // Plan totals are displayed in the trip currency — only surface offers
-    // already priced in it (Duffel has no currency request parameter).
-    const result: FlightOffer[] = summaries
-      .filter((s) => s.totalCurrency === params.currency)
-      .map((s) => {
-        const flights = s.flights.map((f) => ({ ...f, bookingLink: flightsLink }));
-        return {
-          flights,
-          price: Math.round(s.totalAmount),
-          currency: s.totalCurrency,
-          airlines: [s.airlineName],
-          airlineCodes: [s.airlineCode],
-          refundable: s.refundable,
-          durationMinutes: s.durationMinutes,
-          bookingLink: flightsLink,
-        };
-      });
+    // Show every live offer, priced in the traveller's selected currency (Duffel
+    // has no currency request param, so we convert its price for display). These
+    // are the exact fares the booking screen will re-fetch, so they correlate.
+    const result: FlightOffer[] = summaries.map((s) => {
+      const flights = s.flights.map((f) => ({ ...f, bookingLink: flightsLink }));
+      return {
+        flights,
+        price: Math.round(s.displayAmount),
+        currency: s.displayCurrency,
+        airlines: [s.airlineName],
+        airlineCodes: [s.airlineCode],
+        refundable: s.refundable,
+        durationMinutes: s.durationMinutes,
+        bookingLink: flightsLink,
+      };
+    });
 
     if (result.length === 0) {
       return { ok: false, error: "No Duffel offers for this route/date in the trip currency." };

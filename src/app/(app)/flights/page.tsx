@@ -22,8 +22,19 @@ export default async function FlightsPage({
     return: first(sp.return) || "",
     adults: Math.max(1, Math.min(9, parseInt(first(sp.adults), 10) || 1)),
     cabin: first(sp.cabin) || "economy",
+    currency: first(sp.currency) || "",
     autoSearch: sp.autoSearch === "true",
   };
+
+  // When "Book now" comes from an itinerary it carries the hotel too, so the same
+  // one press books the stay right after the flight.
+  const hotelCity = first(sp.hotelCity);
+  const checkIn = first(sp.checkIn);
+  const checkOut = first(sp.checkOut);
+  const hotel =
+    hotelCity && checkIn && checkOut
+      ? { city: hotelCity, checkIn, checkOut, adults: prefill.adults }
+      : null;
 
   const liveMode = process.env.DUFFEL_ACCESS_TOKEN?.startsWith("duffel_live_") ?? false;
 
@@ -32,6 +43,7 @@ export default async function FlightsPage({
       configured={Boolean(process.env.DUFFEL_ACCESS_TOKEN)}
       liveMode={liveMode}
       prefill={prefill}
+      hotel={hotel}
       contact={{ name: profile.name, email: profile.email, phone: profile.phone }}
     />
   );

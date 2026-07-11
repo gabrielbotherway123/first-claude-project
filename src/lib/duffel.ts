@@ -1,5 +1,6 @@
 import "server-only";
 import type { FlightDetail } from "@/lib/types";
+import { convertCurrency } from "@/lib/currency";
 
 // Minimal typed client for the Duffel flights API (v2).
 // Docs: https://duffel.com/docs — every request/response body is wrapped in
@@ -159,6 +160,9 @@ export interface DuffelOfferSummary {
   /** Unmodified total_amount string from Duffel — pass this, not totalAmount, into payments. */
   totalAmountRaw: string;
   totalCurrency: string;
+  /** totalAmount converted to the traveller's selected currency, for display only. */
+  displayAmount: number;
+  displayCurrency: string;
   airlineName: string;
   airlineCode: string;
   airlineLogo?: string;
@@ -218,8 +222,9 @@ function sliceToFlightDetail(slice: DuffelSlice, pricePerSlice: number, isReturn
   };
 }
 
-function toSummary(offer: DuffelOffer): DuffelOfferSummary {
+function toSummary(offer: DuffelOffer, displayCurrency?: string): DuffelOfferSummary {
   const total = parseFloat(offer.total_amount);
+  const dispCur = (displayCurrency || offer.total_currency).toUpperCase();
   const perSlice = total / offer.slices.length;
   const flights = offer.slices.map((s, i) => sliceToFlightDetail(s, perSlice, i > 0));
   const durationMinutes = offer.slices.reduce(
@@ -237,6 +242,8 @@ function toSummary(offer: DuffelOffer): DuffelOfferSummary {
     totalAmount: total,
     totalAmountRaw: offer.total_amount,
     totalCurrency: offer.total_currency,
+    displayAmount: Math.round(convertCurrency(total, offer.total_currency, dispCur) * 100) / 100,
+    displayCurrency: dispCur,
     airlineName: offer.owner.name,
     airlineCode: offer.owner.iata_code,
     airlineLogo: offer.owner.logo_symbol_url,
@@ -260,6 +267,8 @@ export interface DuffelSearchParams {
   children?: number;
   cabinClass: "economy" | "premium_economy" | "business" | "first";
   maxConnections?: number;
+  /** Currency to convert prices into for display (booking still uses Duffel's own). */
+  displayCurrency?: string;
 }
 
 export async function searchDuffelOffers(params: DuffelSearchParams): Promise<DuffelOfferSummary[]> {
@@ -298,13 +307,13 @@ export async function searchDuffelOffers(params: DuffelSearchParams): Promise<Du
     timeoutMs: 20_000,
   });
 
-  return offers.map(toSummary);
+  return offers.map((o) => toSummary(o, params.displayCurrency));
 }
 
 /** Re-fetch a single offer for a fresh price right before booking. */
-export async function getDuffelOffer(offerId: string): Promise<DuffelOfferSummary> {
+export async function getDuffelOffer(offerId: string, displayCurrency?: string): Promise<DuffelOfferSummary> {
   const offer = await duffelFetch<DuffelOffer>(`/air/offers/${encodeURIComponent(offerId)}`, { timeoutMs: 20_000 });
-  return toSummary(offer);
+  return toSummary(offer, displayCurrency);
 }
 
 /* ─── Booking ───────────────────────────────────────────────── */

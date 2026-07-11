@@ -44,7 +44,7 @@ function buildDefaults(profile: UserProfile): TripFormData {
     currency: "NZD", // default currency
     numberOfTravellers: 1, // adults
     numberOfChildren: 0,
-    cabinClass: (profile.defaultCabinClass || "economy") as TripFormData["cabinClass"],
+    cabinClass: "economy", // Economy is always the default
     directOnly: true, // prefer non-stop flights by default
     preferredAirline: "",
     airlineRewards: "",

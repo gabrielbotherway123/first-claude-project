@@ -13,6 +13,7 @@ const searchSchema = z.object({
   children: z.number().int().min(0).max(8).optional(),
   cabinClass: z.enum(["economy", "premium_economy", "business", "first"]),
   directOnly: z.boolean().optional(),
+  currency: z.string().length(3).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
       children: p.children ?? 0,
       cabinClass: p.cabinClass,
       maxConnections: p.directOnly ? 0 : 1,
+      displayCurrency: p.currency,
     });
     return NextResponse.json({ offers });
   } catch (err) {

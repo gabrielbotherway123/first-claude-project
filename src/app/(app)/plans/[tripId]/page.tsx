@@ -35,77 +35,26 @@ interface PlanWithId extends TravelPlan {
   id: string;
 }
 
-/** Google Calendar "add event" template link for the whole trip. */
-function googleCalendarUrl(trip: TripData, plan: PlanWithId): string {
-  const start = trip.departureDate.replace(/-/g, "");
-  // Google treats the end date as exclusive for all-day events — add a day.
-  const endBase = trip.returnDate || trip.departureDate;
-  const end = new Date(endBase);
-  end.setDate(end.getDate() + 1);
-  const endStr = end.toISOString().slice(0, 10).replace(/-/g, "");
-  const dest = trip.destinations.map(stripCode).join(", ");
-  const outbound = plan.flights.find((f) => !f.isReturn);
-  const details =
-    `Atlas itinerary — ${plan.label}\n` +
-    `Route: ${stripCode(trip.originCity)} → ${dest}\n` +
-    (outbound ? `Outbound: ${outbound.airline} ${outbound.flightNumber} at ${outbound.departure.time}\n` : "") +
-    `Hotel: ${plan.hotel.name}\n` +
-    `Estimated total: ${trip.currency} ${plan.totalCost.toLocaleString()}`;
-  const qs = new URLSearchParams({
-    action: "TEMPLATE",
-    text: `Trip to ${dest}`,
-    dates: `${start}/${endStr}`,
-    details,
-    location: dest,
-  });
-  return `https://calendar.google.com/calendar/render?${qs.toString()}`;
-}
-
-/** One-click flight checkout: pre-loads the route so Atlas books the fare via
- *  Duffel with no search step — the traveller just confirms and pays. */
-function flightCheckoutUrl(trip: TripData): string {
+/** "Book now": one press books the flight AND the hotel through Atlas/Duffel.
+ *  Pre-loads the route + destination so there's no search step — the traveller
+ *  just confirms their details and pays once. */
+function bookNowUrl(trip: TripData): string {
   const qs = new URLSearchParams({
     origin: trip.originCity,
     destination: trip.destinations[0] ?? "",
     depart: trip.departureDate,
     adults: String(trip.numberOfTravellers),
     cabin: trip.cabinClass,
+    currency: trip.currency,
     autoSearch: "true",
+    // Hotel leg — booked in the same press right after the flight.
+    hotelCity: stripCode(trip.destinations[0] ?? ""),
+    checkIn: trip.departureDate,
+    checkOut: trip.returnDate || trip.departureDate,
   });
   if (trip.returnDate) qs.set("return", trip.returnDate);
   return `/flights?${qs.toString()}`;
 }
-
-/** One-click hotel checkout: Atlas searches Duffel Stays for the destination
- *  city and books a room — the guest just confirms and pays. */
-function hotelCheckoutUrl(trip: TripData): string {
-  const qs = new URLSearchParams({
-    city: stripCode(trip.destinations[0] ?? ""),
-    checkIn: trip.departureDate,
-    checkOut: trip.returnDate || trip.departureDate,
-    adults: String(trip.numberOfTravellers),
-  });
-  return `/hotels/book?${qs.toString()}`;
-}
-
-/** Share the itinerary via the native share sheet, falling back to email. */
-async function shareItinerary(trip: TripData, plan: PlanWithId) {
-  const dest = trip.destinations.map(stripCode).join(", ");
-  const text =
-    `My Atlas trip to ${dest} (${trip.departureDate} – ${trip.returnDate}).\n` +
-    `${plan.label} · estimated total ${trip.currency} ${plan.totalCost.toLocaleString()}.`;
-  const nav = navigator as Navigator & { share?: (data: ShareData) => Promise<void> };
-  if (typeof nav.share === "function") {
-    try {
-      await nav.share({ title: `Trip to ${dest}`, text });
-      return;
-    } catch {
-      /* user cancelled or share failed — fall through to email */
-    }
-  }
-  window.location.href = `mailto:?subject=${encodeURIComponent(`Trip to ${dest}`)}&body=${encodeURIComponent(text)}`;
-}
-
 
 function stripCode(s: string) {
   return s.replace(/\s*\(.*\)/, "");
@@ -422,34 +371,15 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
               </div>
             </div>
 
-            {/* Book flights via Atlas (one click → Duffel checkout) + calendar / share */}
-            {trip && (
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                {config.flightsConfigured && (
-                  <Button onClick={() => router.push(flightCheckoutUrl(trip))}>
-                    Book flights →
-                  </Button>
-                )}
-                {config.hotelsConfigured && (
-                  <Button onClick={() => router.push(hotelCheckoutUrl(trip))}>
-                    Book hotel →
-                  </Button>
-                )}
-                <a
-                  href={googleCalendarUrl(trip, selectedPlan)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-4 py-2 rounded-xl text-sm border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] transition-all"
-                >
-                  Add to Google Calendar
-                </a>
-                <button
-                  type="button"
-                  onClick={() => shareItinerary(trip, selectedPlan)}
-                  className="inline-flex items-center px-4 py-2 rounded-xl text-sm border border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] transition-all"
-                >
-                  Share with family
-                </button>
+            {/* One press books the flight + hotel together through Atlas/Duffel. */}
+            {trip && config.flightsConfigured && (
+              <div className="mt-6">
+                <Button onClick={() => router.push(bookNowUrl(trip))} className="w-full !py-4 text-base">
+                  Book now — flights &amp; hotel
+                </Button>
+                <p className="text-center text-xs text-[var(--text-dim)] mt-2">
+                  Confirm your details once; Atlas books both and adds the trip to your Google Calendar.
+                </p>
               </div>
             )}
 
