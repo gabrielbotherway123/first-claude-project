@@ -4,7 +4,6 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui";
-import { FlightBooking, type FlightsPrefill } from "@/components/flight-booking";
 import { TravelPlan } from "@/lib/types";
 
 interface TripData {
@@ -61,6 +60,21 @@ function googleCalendarUrl(trip: TripData, plan: PlanWithId): string {
   return `https://calendar.google.com/calendar/render?${qs.toString()}`;
 }
 
+/** One-click flight checkout: pre-loads the route so Atlas books the fare via
+ *  Duffel with no search step — the traveller just confirms and pays. */
+function flightCheckoutUrl(trip: TripData): string {
+  const qs = new URLSearchParams({
+    origin: trip.originCity,
+    destination: trip.destinations[0] ?? "",
+    depart: trip.departureDate,
+    adults: String(trip.numberOfTravellers),
+    cabin: trip.cabinClass,
+    autoSearch: "true",
+  });
+  if (trip.returnDate) qs.set("return", trip.returnDate);
+  return `/flights?${qs.toString()}`;
+}
+
 /** Share the itinerary via the native share sheet, falling back to email. */
 async function shareItinerary(trip: TripData, plan: PlanWithId) {
   const dest = trip.destinations.map(stripCode).join(", ");
@@ -102,7 +116,6 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
   const [plans, setPlans] = useState<PlanWithId[]>([]);
   const [config, setConfig] = useState<FlightsConfig>({ flightsConfigured: false, flightsLiveMode: false });
   const [selected, setSelected] = useState<string | null>(null);
-  const [bookingOpen, setBookingOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState("");
@@ -120,10 +133,8 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
       .finally(() => setLoading(false));
   }, [tripId]);
 
-  // Collapse the inline booking flow whenever a different itinerary is chosen.
   function choosePlan(id: string) {
     setSelected(id);
-    setBookingOpen(false);
   }
 
   async function handleBook() {
@@ -398,12 +409,12 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
               </div>
             </div>
 
-            {/* Book on this screen + calendar / share */}
+            {/* Book flights via Atlas (one click → Duffel checkout) + calendar / share */}
             {trip && (
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 {config.flightsConfigured && (
-                  <Button onClick={() => setBookingOpen((o) => !o)}>
-                    {bookingOpen ? "Hide flight booking" : "Book this flight in Atlas →"}
+                  <Button onClick={() => router.push(flightCheckoutUrl(trip))}>
+                    Book flights →
                   </Button>
                 )}
                 <a
@@ -423,33 +434,6 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                 </button>
               </div>
             )}
-
-            {/* Inline Duffel flight booking — book without leaving this screen */}
-            <AnimatePresence>
-              {bookingOpen && trip && config.flightsConfigured && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-4 border-t border-[var(--border)] pt-2 overflow-hidden"
-                >
-                  <FlightBooking
-                    configured={config.flightsConfigured}
-                    liveMode={config.flightsLiveMode}
-                    prefill={{
-                      origin: trip.originCity,
-                      destination: trip.destinations[0] ?? "",
-                      depart: trip.departureDate,
-                      return: trip.returnDate,
-                      adults: trip.numberOfTravellers,
-                      cabin: trip.cabinClass,
-                      autoSearch: true,
-                    } satisfies FlightsPrefill}
-                    contact={{ name: trip.fullName, email: trip.email, phone: trip.phone }}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
 
           </motion.div>
         )}

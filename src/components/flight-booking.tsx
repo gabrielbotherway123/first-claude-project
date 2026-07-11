@@ -149,10 +149,19 @@ export function FlightBooking({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Search failed");
-      setOffers(data.offers ?? []);
-      setStep("results");
-      if ((data.offers ?? []).length === 0) {
-        setNotice("No fares found for this route and date — try different dates or airports.");
+      const found: OfferView[] = data.offers ?? [];
+      setOffers(found);
+      // Arriving from a chosen itinerary: skip the results list and drop straight
+      // onto the pay screen for the best fare — one click from plan to booking.
+      // Prefer the cheapest non-stop; fall back to the cheapest overall.
+      if (prefill.autoSearch && found.length > 0) {
+        const direct = found.filter((o) => o.flights.every((f) => f.layovers.length === 0));
+        selectOffer(direct[0] ?? found[0]);
+      } else {
+        setStep("results");
+        if (found.length === 0) {
+          setNotice("No fares found for this route and date — try different dates or airports.");
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Search failed");
@@ -281,6 +290,7 @@ export function FlightBooking({
         )}
       </div>
 
+      {(!prefill.autoSearch || (step === "results" && offers.length === 0 && !searching)) && (
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-strong rounded-2xl p-6 mb-6">
         <div className="flex gap-2 mb-5">
           {(["return", "one_way"] as const).map((t) => (
@@ -334,6 +344,18 @@ export function FlightBooking({
           {searching ? "Searching live fares…" : "Search flights"}
         </Button>
       </motion.div>
+      )}
+
+      {prefill.autoSearch && searching && (
+        <div className="flex flex-col items-center justify-center py-16">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+            className="w-10 h-10 rounded-full border-2 border-[var(--border)] border-t-[var(--accent)] mb-4"
+          />
+          <p className="text-[var(--text-muted)]">Finding your fare…</p>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-xl bg-[var(--danger)]/10 border border-[var(--danger)]/30 px-4 py-3 text-sm text-[var(--danger)] mb-4">

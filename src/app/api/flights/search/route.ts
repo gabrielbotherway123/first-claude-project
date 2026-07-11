@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
-import { duffelPlanSearchEnabled, duffelFlights } from "@/lib/providers/duffel";
+import { duffelConfigured, searchDuffelOffers, DuffelApiError } from "@/lib/duffel";
 import { rateLimit } from "@/lib/cache";
 
 const searchSchema = z.object({
@@ -18,8 +18,10 @@ const searchSchema = z.object({
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!duffelPlanSearchEnabled()) return NextResponse.json({ error: "Flight booking is not configured." }, { status: 503 });
-  if (!rateLimit(`flights:search:${session.user.id}`, 20, 60_000)) return NextResponse.json({ error: "Too many requests — please wait a moment and try again." }, { status: 429 });
+  if (!duffelConfigured()) return NextResponse.json({ error: "Flight booking is not configured." }, { status: 503 });
+  if (!rateLimit(`flights:search:${session.user.id}`, 20, 60_000)) {
+    return NextResponse.json({ error: "Too many requests — please wait a moment and try again." }, { status: 429 });
+  }
 
   const parsed = searchSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid search parameters." }, { status: 400 });
@@ -33,7 +35,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await duffelFlights({
+    // Returns DuffelOfferSummary[] (offerId + passengerIds + flights) — the exact
+    // shape the booking flow needs. Offers come sorted cheapest-first.
+    const offers = await searchDuffelOffers({
       origin: p.origin.toUpperCase(),
       destination: p.destination.toUpperCase(),
       departureDate: p.departureDate,
@@ -41,12 +45,17 @@ export async function POST(req: NextRequest) {
       adults: p.adults,
       children: p.children ?? 0,
       cabinClass: p.cabinClass,
-      currency: "USD",
-      directOnly: p.directOnly,
+      maxConnections: p.directOnly ? 0 : 1,
     });
-    if (!result.ok) throw new Error(result.error || "Search failed");
-    return NextResponse.json({ offers: result.data || [] });
+    return NextResponse.json({ offers });
   } catch (err) {
+    if (err instanceof DuffelApiError) {
+      console.error("Duffel search error:", err.code, err.message);
+      return NextResponse.json(
+        { error: err.status >= 500 ? "The flight search service is unavailable — try again shortly." : err.message },
+        { status: 502 }
+      );
+    }
     console.error("Flight search error:", err);
     return NextResponse.json({ error: "Flight search failed." }, { status: 500 });
   }
