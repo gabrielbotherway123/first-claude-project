@@ -28,6 +28,7 @@ interface TripData {
 interface FlightsConfig {
   flightsConfigured: boolean;
   flightsLiveMode: boolean;
+  hotelsConfigured: boolean;
 }
 
 interface PlanWithId extends TravelPlan {
@@ -75,6 +76,18 @@ function flightCheckoutUrl(trip: TripData): string {
   return `/flights?${qs.toString()}`;
 }
 
+/** One-click hotel checkout: Atlas searches Duffel Stays for the destination
+ *  city and books a room — the guest just confirms and pays. */
+function hotelCheckoutUrl(trip: TripData): string {
+  const qs = new URLSearchParams({
+    city: stripCode(trip.destinations[0] ?? ""),
+    checkIn: trip.departureDate,
+    checkOut: trip.returnDate || trip.departureDate,
+    adults: String(trip.numberOfTravellers),
+  });
+  return `/hotels/book?${qs.toString()}`;
+}
+
 /** Share the itinerary via the native share sheet, falling back to email. */
 async function shareItinerary(trip: TripData, plan: PlanWithId) {
   const dest = trip.destinations.map(stripCode).join(", ");
@@ -114,7 +127,7 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
   const router = useRouter();
   const [trip, setTrip] = useState<TripData | null>(null);
   const [plans, setPlans] = useState<PlanWithId[]>([]);
-  const [config, setConfig] = useState<FlightsConfig>({ flightsConfigured: false, flightsLiveMode: false });
+  const [config, setConfig] = useState<FlightsConfig>({ flightsConfigured: false, flightsLiveMode: false, hotelsConfigured: false });
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
@@ -415,6 +428,11 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                 {config.flightsConfigured && (
                   <Button onClick={() => router.push(flightCheckoutUrl(trip))}>
                     Book flights →
+                  </Button>
+                )}
+                {config.hotelsConfigured && (
+                  <Button onClick={() => router.push(hotelCheckoutUrl(trip))}>
+                    Book hotel →
                   </Button>
                 )}
                 <a

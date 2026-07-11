@@ -113,7 +113,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ orderId: record.id, reference: record.bookingReference });
   } catch (err) {
     if (err instanceof DuffelApiError) {
-      console.error("Duffel Stays booking error:", err.code, err.message);
+      console.error("Duffel Stays booking error:", err.status, err.code, err.message);
+      if (err.status === 401 || err.status === 403) {
+        return NextResponse.json(
+          { error: "Hotel booking isn't enabled on this Duffel account yet — activate Duffel Stays in your Duffel dashboard." },
+          { status: 503 }
+        );
+      }
       if (["rate_expired", "rate_no_longer_available", "quote_expired"].includes(err.code)) {
         return NextResponse.json(
           { error: "This rate is no longer available — please search again.", code: "rate_expired" },

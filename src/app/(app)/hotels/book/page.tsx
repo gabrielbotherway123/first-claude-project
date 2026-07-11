@@ -16,13 +16,16 @@ export default async function HotelBookPage({
   const sp = await searchParams;
   const profile = await getCurrentProfile();
 
-  const accommodationId = first(sp.accommodationId);
+  const rawAccommodationId = first(sp.accommodationId);
+  const accommodationId = /^acc_[A-Za-z0-9]+$/.test(rawAccommodationId) ? rawAccommodationId : "";
   const city = first(sp.city);
   const checkIn = first(sp.checkIn);
   const checkOut = first(sp.checkOut);
   const adults = Math.min(9, Math.max(1, parseInt(first(sp.adults), 10) || 1));
 
-  if (!/^acc_[A-Za-z0-9]+$/.test(accommodationId) || !city || !checkIn || !checkOut) {
+  // A specific hotel (accommodationId) OR a destination city is enough — with a
+  // city alone, Atlas searches Duffel Stays and books the best-value room.
+  if (!city || !checkIn || !checkOut) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
         <h1 className="text-2xl font-semibold mb-3">Hotel not found</h1>

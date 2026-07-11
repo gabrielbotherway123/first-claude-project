@@ -166,6 +166,7 @@ export async function GET(req: NextRequest) {
     config: {
       flightsConfigured: Boolean(process.env.DUFFEL_ACCESS_TOKEN),
       flightsLiveMode: (process.env.DUFFEL_ACCESS_TOKEN ?? "").startsWith("duffel_live_"),
+      hotelsConfigured: Boolean(process.env.DUFFEL_ACCESS_TOKEN),
     },
   });
 }
