@@ -172,8 +172,10 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
       return setError("Please describe the purpose of your trip.");
 
     // When "Other" is chosen, the free-text description becomes the purpose.
+    // Flights are always sourced non-stop — this is implicit, never shown.
     const payload: TripFormData = {
       ...form,
+      directOnly: true,
       tripPurpose:
         form.tripPurpose === "Other" ? form.customPurpose!.trim() : form.tripPurpose,
     };
@@ -351,20 +353,19 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
               <SectionTitle>Dates & party</SectionTitle>
               <DateRangePicker from={form.departureDate} to={form.returnDate} onChange={setDates} />
 
-              <FloatingInput
-                label="Total budget (optional)"
-                type="number"
-                min={0}
-                value={form.totalBudget ? form.totalBudget : ""}
-                onChange={(e) => set("totalBudget", e.target.value ? parseFloat(e.target.value) : undefined)}
-              />
-
-              <div>
-                <FieldLabel>Currency</FieldLabel>
-                <Pills
-                  options={CURRENCIES}
+              <div className="grid sm:grid-cols-2 gap-4">
+                <FloatingInput
+                  label="Total budget (optional)"
+                  type="number"
+                  min={0}
+                  value={form.totalBudget ? form.totalBudget : ""}
+                  onChange={(e) => set("totalBudget", e.target.value ? parseFloat(e.target.value) : undefined)}
+                />
+                <Select
+                  label="Currency"
                   value={form.currency}
-                  onSelect={(c) => set("currency", c)}
+                  onChange={(v) => set("currency", v)}
+                  options={CURRENCIES.map((c) => ({ value: c, label: c }))}
                 />
               </div>
 
@@ -395,21 +396,6 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
                 onChange={(v) => set("cabinClass", v as TripFormData["cabinClass"])}
                 options={CABIN_OPTIONS}
               />
-
-              <div>
-                <FieldLabel>Flight preference</FieldLabel>
-                <button
-                  type="button"
-                  onClick={() => set("directOnly", !form.directOnly)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
-                    form.directOnly
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]"
-                      : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]"
-                  }`}
-                >
-                  Prefer direct flights (even if pricier)
-                </button>
-              </div>
             </GlassCard>
 
             <div className="flex justify-end">
@@ -499,11 +485,12 @@ export function TripPlanner({ profile }: { profile: UserProfile }) {
             <GlassCard strong className="p-7 space-y-5">
               <SectionTitle>Context</SectionTitle>
               <div>
-                <FieldLabel>Purpose of trip</FieldLabel>
-                <Pills
-                  options={PURPOSES}
+                <Select
+                  label="Purpose of trip"
                   value={form.tripPurpose}
-                  onSelect={(p) => set("tripPurpose", p)}
+                  onChange={(v) => set("tripPurpose", v)}
+                  placeholder="Select…"
+                  options={PURPOSES.map((p) => ({ value: p, label: p }))}
                 />
                 {form.tripPurpose === "Other" && (
                   <div className="mt-3">
@@ -645,37 +632,4 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <p className="text-sm text-[var(--text-muted)] mb-2">{children}</p>;
-}
-
-/** Wrapping pill selector — shows every option at once, no dropdown, no scroll. */
-function Pills({
-  options,
-  value,
-  onSelect,
-}: {
-  options: string[];
-  value: string;
-  onSelect: (v: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((o) => {
-        const selected = value === o;
-        return (
-          <button
-            key={o}
-            type="button"
-            onClick={() => onSelect(o)}
-            className={`px-3 py-1.5 rounded-full text-sm border transition-all ${
-              selected
-                ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]"
-                : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]"
-            }`}
-          >
-            {o}
-          </button>
-        );
-      })}
-    </div>
-  );
 }

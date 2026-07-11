@@ -49,7 +49,7 @@ Atlas · Private Travel
       <p style="color:#718096;font-size:12px;margin:0 0 4px;letter-spacing:1px">${f.isReturn ? "RETURN" : "OUTBOUND"}</p>
       <p style="color:#0a1628;font-size:15px;font-weight:bold;margin:0">${esc(f.airline)} ${esc(f.flightNumber)}</p>
       <p style="color:#4a5568;margin:4px 0">${esc(f.departure.airport)} ${esc(f.departure.time)} → ${esc(f.arrival.airport)} ${esc(f.arrival.time)} · ${esc(f.departure.date)}</p>
-      <p style="color:#718096;font-size:13px;margin:0">${esc(f.duration)}${f.layovers.length > 0 ? ` · via ${esc(f.layovers.map((l) => l.airport).join(", "))}` : " · Direct"}</p>
+      <p style="color:#718096;font-size:13px;margin:0">${esc(f.duration)}${f.layovers.length > 0 ? ` · via ${esc(f.layovers.map((l) => l.airport).join(", "))}` : ""}</p>
     </div>`
     )
     .join("");
@@ -262,14 +262,14 @@ function buildEmailHtml(booking: BookingDetails): string {
             <p style="color:#718096;font-size:12px;margin:0 0 4px;letter-spacing:1px">OUTBOUND</p>
             <p style="color:#0a1628;font-size:15px;font-weight:bold;margin:0">${esc(outbound.airline)} ${esc(outbound.flightNumber)}</p>
             <p style="color:#4a5568;margin:4px 0">${esc(outbound.departure.airport)} ${esc(outbound.departure.time)} → ${esc(outbound.arrival.airport)} ${esc(outbound.arrival.time)}</p>
-            <p style="color:#718096;font-size:13px;margin:0">${esc(outbound.duration)}${outbound.layovers.length > 0 ? ` · via ${esc(outbound.layovers.map((l) => l.airport).join(", "))}` : " · Direct"}</p>
+            <p style="color:#718096;font-size:13px;margin:0">${esc(outbound.duration)}${outbound.layovers.length > 0 ? ` · via ${esc(outbound.layovers.map((l) => l.airport).join(", "))}` : ""}</p>
           </div>` : ""}
           ${returnFlight ? `
           <div>
             <p style="color:#718096;font-size:12px;margin:8px 0 4px;letter-spacing:1px">RETURN</p>
             <p style="color:#0a1628;font-size:15px;font-weight:bold;margin:0">${esc(returnFlight.airline)} ${esc(returnFlight.flightNumber)}</p>
             <p style="color:#4a5568;margin:4px 0">${esc(returnFlight.departure.airport)} ${esc(returnFlight.departure.time)} → ${esc(returnFlight.arrival.airport)} ${esc(returnFlight.arrival.time)}</p>
-            <p style="color:#718096;font-size:13px;margin:0">${esc(returnFlight.duration)}${returnFlight.layovers.length > 0 ? ` · via ${esc(returnFlight.layovers.map((l) => l.airport).join(", "))}` : " · Direct"}</p>
+            <p style="color:#718096;font-size:13px;margin:0">${esc(returnFlight.duration)}${returnFlight.layovers.length > 0 ? ` · via ${esc(returnFlight.layovers.map((l) => l.airport).join(", "))}` : ""}</p>
           </div>` : ""}
         </div>
 

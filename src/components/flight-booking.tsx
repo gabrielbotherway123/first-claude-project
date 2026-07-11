@@ -386,8 +386,8 @@ export function FlightBooking({
                         <span className="flex-1 border-t border-dashed border-[var(--border-strong)]" />
                         <span className="text-xs text-[var(--text-dim)]">{f.arrival.time}</span>
                         <span className="font-bold">{f.arrival.airport}</span>
-                        <span className={`text-xs ${f.layovers.length === 0 ? "text-[var(--success)]" : "text-[var(--accent)]"} w-14 text-right shrink-0`}>
-                          {f.layovers.length === 0 ? "Direct" : `${f.layovers.length} stop`}
+                        <span className="text-xs text-[var(--accent)] w-14 text-right shrink-0">
+                          {f.layovers.length > 0 ? `${f.layovers.length} stop` : ""}
                         </span>
                       </div>
                     ))}
@@ -438,7 +438,7 @@ export function FlightBooking({
                       {f.departure.airport} {f.departure.time} → {f.arrival.airport} {f.arrival.time}
                     </span>
                     <span className="text-xs text-[var(--text-dim)]">
-                      {f.departure.date} · {f.duration} · {f.layovers.length === 0 ? "Direct" : `${f.layovers.length} stop`}
+                      {f.departure.date} · {f.duration}{f.layovers.length > 0 ? ` · ${f.layovers.length} stop` : ""}
                     </span>
                   </div>
                 ))}

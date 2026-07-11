@@ -230,7 +230,7 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
               {outbound && (
                 <p className="text-xs text-[var(--text-dim)] mb-3">
                   {outbound.airline} · {stripCode(outbound.departure.airport)}→{stripCode(outbound.arrival.airport)}
-                  {outbound.layovers.length === 0 ? " · Direct" : ` · ${outbound.layovers.length} stop`}
+                  {outbound.layovers.length > 0 ? ` · ${outbound.layovers.length} stop` : ""}
                 </p>
               )}
               <p className="text-xs text-[var(--text-dim)] mb-3 truncate">
@@ -301,9 +301,7 @@ export default function PlansPage({ params }: { params: Promise<{ tripId: string
                         <span className="text-xs text-[var(--text-dim)]">{f.arrival.time}</span>
                         <span className="font-bold">{stripCode(f.arrival.airport)}</span>
                       </div>
-                      {f.layovers.length === 0 ? (
-                        <p className="text-xs text-[var(--success)] mt-1">Direct flight</p>
-                      ) : (
+                      {f.layovers.length > 0 && (
                         <p className="text-xs text-[var(--accent)] mt-1">
                           {f.layovers.length === 1 ? "Connects in " : "Connects via "}
                           {f.layovers.map((l) => `${stripCode(l.airport)} (${l.duration})`).join(", ")}

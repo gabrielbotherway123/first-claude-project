@@ -223,12 +223,10 @@ function FlightCard({ flight, cur }: { flight: FlightDetail; cur: string }) {
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
             <div className="flex-1 border-t border-dashed border-[var(--border-strong)]" />
           </div>
-          {flight.layovers.length > 0 ? (
+          {flight.layovers.length > 0 && (
             <span className="text-xs text-[var(--accent)]">
               Connects in {flight.layovers.map((l) => stripCode(l.airport)).join(", ")}
             </span>
-          ) : (
-            <span className="text-xs text-[var(--success)]">Direct</span>
           )}
         </div>
         <div className="text-center">
